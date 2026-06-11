@@ -18,6 +18,7 @@ import { colors, LAYOUT, radii, shadows, spacing, typography } from '@/constants
 import { useApp } from '@/store/AppContext';
 import { applyDiscount, teamDiscountPercent } from '@/utils/discount';
 import { formatPrice, memberWord } from '@/utils/format';
+import { batchProgress } from '@/utils/seller';
 
 const PREVIEW_TEAM_SIZE = 3;
 
@@ -142,6 +143,36 @@ export default function ProductDetailScreen() {
             </View>
           </View>
 
+          {/* Seller group-buy target (only for merchant-listed products) */}
+          {product.sellerId && product.groupPrice && product.minBatch ? (
+            <View style={styles.groupCard}>
+              <View style={styles.groupHeader}>
+                <Ionicons name="storefront-outline" size={16} color={colors.savingsDeep} />
+                <Text style={styles.groupHeaderText}>Оптовая цена от продавца</Text>
+              </View>
+              <View style={styles.groupRow}>
+                <View>
+                  <Text style={styles.groupPriceLabel}>При наборе группы</Text>
+                  <Text style={styles.groupPrice}>{formatPrice(product.groupPrice)}</Text>
+                </View>
+                <View style={styles.groupTargetBox}>
+                  <Text style={styles.groupTargetText}>
+                    {batchProgress(product).current} / {batchProgress(product).target}
+                  </Text>
+                  <Text style={styles.groupTargetLabel}>{memberWord(batchProgress(product).target)}</Text>
+                </View>
+              </View>
+              <View style={styles.groupTrack}>
+                <View style={[styles.groupFill, { width: `${batchProgress(product).percent}%` }]} />
+              </View>
+              <Text style={styles.groupHint}>
+                {batchProgress(product).reached
+                  ? 'Группа собрана — оптовая цена доступна!'
+                  : `Ещё ${batchProgress(product).remaining} участников до оптовой цены`}
+              </Text>
+            </View>
+          ) : null}
+
           <Text style={styles.sectionTitle}>Что входит</Text>
           <CheckList
             items={[
@@ -249,6 +280,18 @@ const styles = StyleSheet.create({
   savingsValue: { ...typography.h2, color: colors.success, marginTop: 2 },
   explain: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg, backgroundColor: colors.surfaceAlt, padding: spacing.md, borderRadius: radii.sm },
   explainText: { ...typography.caption, color: colors.textSecondary, flex: 1, lineHeight: 18 },
+  groupCard: { backgroundColor: colors.successSoft, borderRadius: radii.lg, padding: spacing.lg, marginTop: spacing.lg },
+  groupHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  groupHeaderText: { ...typography.captionStrong, color: colors.savingsDeep },
+  groupRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: spacing.md },
+  groupPriceLabel: { ...typography.caption, color: colors.savingsDeep },
+  groupPrice: { ...typography.h1, color: colors.savingsDeep, marginTop: 2 },
+  groupTargetBox: { alignItems: 'flex-end' },
+  groupTargetText: { ...typography.h3, color: colors.savingsDeep },
+  groupTargetLabel: { ...typography.small, color: colors.savingsDeep },
+  groupTrack: { height: 8, borderRadius: radii.pill, backgroundColor: colors.surface, marginTop: spacing.md, overflow: 'hidden' },
+  groupFill: { height: '100%', borderRadius: radii.pill, backgroundColor: colors.success },
+  groupHint: { ...typography.caption, color: colors.savingsDeep, marginTop: spacing.sm },
   actionBar: { backgroundColor: colors.surface, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   actionInner: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, maxWidth: LAYOUT.maxContentWidth, alignSelf: 'center', width: '100%' },
   actionBtn: { flex: 1 },

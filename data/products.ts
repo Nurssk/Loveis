@@ -4,7 +4,7 @@ import { Product } from '@/types';
  * Mock product catalog. Images use stable Unsplash URLs; the UI degrades
  * gracefully if an image fails to load (see ProductImage component).
  */
-export const PRODUCTS: Product[] = [
+export const SEED_PRODUCTS: Product[] = [
   {
     id: 'p1',
     title: 'Смартфон Galaxy A55 256GB',
@@ -277,10 +277,32 @@ export const PRODUCTS: Product[] = [
   },
 ];
 
-export const PRODUCT_BY_ID: Record<string, Product> = Object.fromEntries(
-  PRODUCTS.map((p) => [p.id, p]),
-);
+/**
+ * Runtime product registry. The 18 seed products are static; seller-created
+ * products are injected at runtime via setSellerProducts() so they surface
+ * everywhere the catalog is read — buyer feed, search, detail and cart — using
+ * the exact same getProduct()/getAllProducts() accessors. The persisted seller
+ * products live in AppContext, which keeps this registry in sync.
+ */
+let sellerProducts: Product[] = [];
+let index: Record<string, Product> = Object.fromEntries(SEED_PRODUCTS.map((p) => [p.id, p]));
+
+function rebuildIndex() {
+  // Seller products win id collisions (none expected) and appear first.
+  index = Object.fromEntries([...SEED_PRODUCTS, ...sellerProducts].map((p) => [p.id, p]));
+}
+
+/** Sync the registry with the persisted seller catalog (called from AppContext). */
+export function setSellerProducts(list: Product[]): void {
+  sellerProducts = Array.isArray(list) ? list : [];
+  rebuildIndex();
+}
+
+/** Full catalog — seller products first, then the seed catalog. */
+export function getAllProducts(): Product[] {
+  return [...sellerProducts, ...SEED_PRODUCTS];
+}
 
 export function getProduct(id: string): Product | undefined {
-  return PRODUCT_BY_ID[id];
+  return index[id];
 }

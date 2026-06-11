@@ -1,8 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useMemo, useReducer } from 'react';
 
+import { setSellerProducts } from '@/data/products';
+import { categoryImage, makeSampleSellerProducts } from '@/data/sellerSamples';
 import { joinDemoTeam, makeMember, DEMO_MEMBER_NAMES } from '@/data/teams';
-import { CartKind, CartState, Order, ShoppingTeam, UserProfile } from '@/types';
+import { CartKind, CartState, Order, Product, SellerProductInput, ShoppingTeam, UserProfile } from '@/types';
 import { orderNumber, randomDeviceId, randomTeamCode, uid } from '@/utils/ids';
 
 const STORAGE_KEY = 'birge.state.v1';
@@ -13,6 +15,7 @@ type PersistedState = {
   cart: CartState;
   recentlyViewed: string[];
   lastOrder: Order | null;
+  sellerProducts: Product[];
 };
 
 type State = PersistedState & { hydrated: boolean };
@@ -25,6 +28,7 @@ const initialState: State = {
   cart: emptyCart,
   recentlyViewed: [],
   lastOrder: null,
+  sellerProducts: [],
   hydrated: false,
 };
 
@@ -67,6 +71,11 @@ type AppContextValue = {
   removeFromCart: (kind: CartKind, productId: string) => void;
   setQuantity: (kind: CartKind, productId: string, qty: number) => void;
   clearCart: (kind: CartKind) => void;
+  // seller
+  becomeSeller: (storeName: string) => void;
+  addSellerProduct: (input: SellerProductInput) => Product | null;
+  updateSellerProduct: (id: string, patch: SellerProductInput) => void;
+  deleteSellerProduct: (id: string) => void;
   // misc
   markViewed: (productId: string) => void;
   placeOrder: (order: Omit<Order, 'id' | 'createdAt'>) => Order;
@@ -93,11 +102,12 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             cart: parsed.cart ?? emptyCart,
             recentlyViewed: Array.isArray(parsed.recentlyViewed) ? parsed.recentlyViewed : [],
             lastOrder: parsed.lastOrder ?? null,
+            sellerProducts: Array.isArray(parsed.sellerProducts) ? parsed.sellerProducts : [],
           },
         });
       } catch {
         // Corrupt/malformed persisted data — start clean rather than crash.
-        if (active) dispatch({ type: 'HYDRATE', payload: { profile: null, team: null, cart: emptyCart, recentlyViewed: [], lastOrder: null } });
+        if (active) dispatch({ type: 'HYDRATE', payload: { profile: null, team: null, cart: emptyCart, recentlyViewed: [], lastOrder: null, sellerProducts: [] } });
       }
     })();
     return () => {
@@ -114,9 +124,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       cart: state.cart,
       recentlyViewed: state.recentlyViewed,
       lastOrder: state.lastOrder,
+      sellerProducts: state.sellerProducts,
     };
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(toPersist)).catch(() => {});
   }, [state]);
+
+  // Keep the runtime product registry in sync with the persisted seller catalog,
+  // so seller products surface in the buyer feed/search/detail via getProduct().
+  useEffect(() => {
+    setSellerProducts(state.sellerProducts);
+  }, [state.sellerProducts]);
 
   const value = useMemo<AppContextValue>(() => {
     const setCart = (cart: CartState) => dispatch({ type: 'SET', payload: { cart } });
@@ -223,6 +240,64 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       clearCart: (kind) => {
         const key = kind === 'team' ? 'teamItems' : 'individualItems';
         setCart({ ...state.cart, [key]: [] });
+      },
+
+      becomeSeller: (storeName) => {
+        if (!state.profile) return;
+        const name = storeName.trim() || 'Мой магазин';
+        const profile: UserProfile = { ...state.profile, isSeller: true, storeName: name };
+        // Seed a small sample catalog the first time, so the cabinet feels alive.
+        const sellerProducts =
+          state.sellerProducts.length === 0
+            ? makeSampleSellerProducts(state.profile.id, name, state.profile.city)
+            : state.sellerProducts;
+        dispatch({ type: 'SET', payload: { profile, sellerProducts } });
+      },
+
+      addSellerProduct: (input) => {
+        if (!state.profile) return null;
+        const product: Product = {
+          id: uid('sp'),
+          sellerId: state.profile.id,
+          title: input.title.trim(),
+          description: input.description.trim(),
+          category: input.category,
+          marketplace: state.profile.storeName ?? 'Мой магазин',
+          image: input.image?.trim() || categoryImage(input.category),
+          regularPrice: input.regularPrice,
+          rating: 5.0,
+          city: state.profile.city,
+          tags: ['новинка'],
+          popularity: 60,
+          activeBuyers: 1 + Math.floor(Math.random() * 4),
+          minBatch: input.minBatch,
+          groupPrice: input.groupPrice,
+        };
+        dispatch({ type: 'SET', payload: { sellerProducts: [product, ...state.sellerProducts] } });
+        return product;
+      },
+
+      updateSellerProduct: (id, patch) => {
+        const sellerProducts = state.sellerProducts.map((p) =>
+          p.id === id
+            ? {
+                ...p,
+                title: patch.title.trim(),
+                description: patch.description.trim(),
+                category: patch.category,
+                marketplace: state.profile?.storeName ?? p.marketplace,
+                image: patch.image?.trim() || categoryImage(patch.category),
+                regularPrice: patch.regularPrice,
+                minBatch: patch.minBatch,
+                groupPrice: patch.groupPrice,
+              }
+            : p,
+        );
+        dispatch({ type: 'SET', payload: { sellerProducts } });
+      },
+
+      deleteSellerProduct: (id) => {
+        dispatch({ type: 'SET', payload: { sellerProducts: state.sellerProducts.filter((p) => p.id !== id) } });
       },
 
       markViewed: (productId) => {

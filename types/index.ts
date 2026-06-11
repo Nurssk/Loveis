@@ -13,6 +13,10 @@ export type Product = {
   tags: string[];
   popularity: number;
   activeBuyers: number;
+  // Seller-created products only. Identifies the merchant and the group-buy target.
+  sellerId?: string;
+  minBatch?: number; // participants needed to unlock the wholesale (group) price
+  groupPrice?: number; // wholesale price the seller offers once the batch fills
 };
 
 export type UserProfile = {
@@ -24,6 +28,20 @@ export type UserProfile = {
   interests: string[];
   isVerified: boolean;
   deviceId: string;
+  // Merchant cabinet. A buyer can also open a store; both modes share one profile.
+  isSeller?: boolean;
+  storeName?: string;
+};
+
+/** Draft passed from the add/edit product form into the store. */
+export type SellerProductInput = {
+  title: string;
+  description: string;
+  category: string;
+  regularPrice: number;
+  groupPrice?: number;
+  minBatch: number;
+  image?: string;
 };
 
 export type TeamMember = {
