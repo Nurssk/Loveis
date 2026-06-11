@@ -1,0 +1,94 @@
+CHANGES — branch: yerkhan-team-buying-commands
+Last updated: 2026-06-11
+
+─────────────────────────────────────────────────────
+UI CHANGES  (app/(tabs)/team.tsx only)
+─────────────────────────────────────────────────────
+
+1. COUNTDOWN TIMER
+   - Added `useCountdown(createdAt)` hook — computes team expiry 48 h from
+     creation and ticks every second via setInterval.
+   - Renders a banner below the header: "Команда активна ещё HH:MM:SS"
+   - Hidden automatically when the timer reaches zero.
+
+2. MILESTONE LADDER  (replaces progress bar)
+   - 6 labelled steps: 1 → 5%, 2 → 10%, … 6 → 30%
+   - Each step is a circle: grey (not reached) → green with checkmark (reached)
+   - The current step gets a primary-color border highlight.
+   - Percentage label under each dot; reached labels turn green + bold.
+
+3. INVITE CARD  (replaces code card)
+   - Dynamic headline: "Пригласите ещё 1 участника / и скидка вырастет до X%"
+     or "Поделитесь командой" when at the 30% cap.
+   - QR code moved into the top-right corner of the invite card.
+   - Team code displayed in a centred pill (primarySoft background).
+   - Split action row: left = "Скопировать" (ghost), right = "Поделиться"
+     (filled primary). Divided by a hairline border.
+
+4. CART PRODUCT LINES  (replaces totals-only summary)
+   - Each team cart item now shows: product title, quantity, discounted price
+     and struck-through original price (when discount > 0).
+   - Discount row and grand total below the item list, unchanged in logic.
+   - Empty-cart state unchanged.
+
+5. COUPONS SECTION  (new — between invite card and members)
+   - Horizontal scroll row of 3 coupon cards.
+   - Coupons derived from state (no AppContext changes needed yet):
+       • "Новичок" −3%: always earned on team entry
+       • "Командный игрок" −5%: earned when memberCount >= 3
+       • "Первая покупка" −2%: earned when teamItems.length > 0
+   - Earned cards: white background, green "Получен" badge with checkmark.
+   - Locked cards: muted/grey, lock icon, "Не получен" badge.
+
+6. WAITING FOR PARTICIPANTS BANNER  (new — inside cart section)
+   - Shown when cart has items AND team discount < 30% (not at max).
+   - Left-bordered warning banner: "Ещё X участников → скидка до 30%"
+   - Hidden when cart is empty or team is already at max discount.
+
+─────────────────────────────────────────────────────
+BACKEND SCAFFOLD  (new files — stubs only, not wired up)
+─────────────────────────────────────────────────────
+
+types/api.ts
+   - All backend row types: DbUser, DbTeam, DbTeamMember, DbCoupon,
+     DbOrder, DbOrderItem
+   - All API param/result types: CreateTeamParams, JoinTeamResult,
+     PlaceOrderParams, etc.
+
+lib/supabase.ts
+   - Supabase client placeholder — SUPABASE_URL and SUPABASE_ANON_KEY
+     are empty strings. createClient is commented out.
+   - TODO: install @supabase/supabase-js, fill credentials, uncomment client.
+
+lib/api/auth.ts     — sendOtp, verifyOtp, signOut, getCurrentUser, upsertProfile
+lib/api/teams.ts    — createTeam, joinTeam, leaveTeam, getTeamByCode,
+                      subscribeToTeamMembers (Realtime stub)
+lib/api/coupons.ts  — getCoupons, applyCoupon, awardCoupon
+lib/api/orders.ts   — placeOrder, getOrders, getOrder,
+                      subscribeToOrderStatus (Realtime stub), cancelOrder
+lib/api/index.ts    — re-exports all API modules as namespaces
+
+supabase/migrations/001_schema.sql
+   - Full PostgreSQL schema: users, teams, team_members, coupons,
+     orders, order_items
+   - RLS enabled on all tables (policies commented out — TODO)
+   - Realtime publication lines commented out — TODO
+
+All API functions throw 'Not implemented'.
+Each file has numbered TODO comments with exact Supabase/SQL code to fill in.
+
+─────────────────────────────────────────────────────
+UNTOUCHED FILES
+─────────────────────────────────────────────────────
+- store/AppContext.tsx       — still uses local mock state
+- types/index.ts             — domain types unchanged
+- app/(auth)/*               — login/verify screens unchanged (mock)
+- app/(tabs)/profile.tsx     — unchanged
+- app/(tabs)/cart.tsx        — unchanged
+- app/(tabs)/home.tsx        — unchanged
+- app/product/[id].tsx       — unchanged
+- app/checkout/*             — unchanged
+- data/*                     — unchanged
+- utils/*                    — unchanged
+- constants/theme.ts         — unchanged
+- components/*               — unchanged
