@@ -7,13 +7,9 @@
  * `regularPrice`, `image`, `activeBuyers`) and the alternate names from the
  * shared Firestore schema (`name`, `retailPrice`, `imageUrl`, `currentGroupSize`),
  * so whatever shape the teammate seeds will render correctly.
- *
- * When Firebase isn't configured yet, it falls back to the bundled mock catalog
- * so the dashboard is fully demoable today.
  */
 import { collection, getDocs } from 'firebase/firestore';
 
-import { PRODUCTS } from '@/data/products';
 import { db, isFirebaseConfigured } from '@/lib/firebase';
 import { Product } from '@/types';
 
@@ -46,18 +42,12 @@ export function toProduct(id: string, raw: RawProduct): Product {
   };
 }
 
-/**
- * Fetch the product catalog. Pulls from Firestore when configured, otherwise
- * returns the bundled catalog so the screen still works offline / pre-Firebase.
- */
+/** Fetch the product catalog from Firestore. Returns [] if not configured or collection is empty. */
 export async function fetchProducts(): Promise<Product[]> {
   if (!isFirebaseConfigured || !db) {
-    return PRODUCTS;
+    return [];
   }
 
   const snapshot = await getDocs(collection(db, 'products'));
-  const products = snapshot.docs.map((doc) => toProduct(doc.id, doc.data() as RawProduct));
-
-  // If the collection is empty (e.g. not seeded yet), don't show a blank screen.
-  return products.length > 0 ? products : PRODUCTS;
+  return snapshot.docs.map((doc) => toProduct(doc.id, doc.data() as RawProduct));
 }

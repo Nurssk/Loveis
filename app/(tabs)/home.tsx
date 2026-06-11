@@ -22,7 +22,7 @@ import { SectionHeader } from '@/components/SectionHeader';
 import { useToast } from '@/components/Toast';
 import { colors, radii, spacing, typography } from '@/constants/theme';
 import { CATEGORIES, categoryLabel } from '@/data/categories';
-import { useProducts } from '@/hooks/useProducts';
+import { useProductsCtx } from '@/store/ProductsContext';
 import { useApp } from '@/store/AppContext';
 import { Product, UserProfile } from '@/types';
 import { lineCount } from '@/utils/cart';
@@ -84,7 +84,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const toast = useToast();
   const { state } = useApp();
-  const { products, loading, refreshing, error, refresh, retry } = useProducts();
+  const { products, loading, refreshing, error, refresh, retry } = useProductsCtx();
 
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<string | null>(null);

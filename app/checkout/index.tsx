@@ -14,6 +14,7 @@ import { colors, radii, shadows, spacing, typography } from '@/constants/theme';
 import { halykConfigured, paymentLinks } from '@/config/payment';
 import { paymentService, PaymentError } from '@/services/paymentService';
 import { useApp } from '@/store/AppContext';
+import { useProductsCtx } from '@/store/ProductsContext';
 import { CartKind } from '@/types';
 import { summarize } from '@/utils/cart';
 import { formatPrice, itemWord } from '@/utils/format';
@@ -36,9 +37,10 @@ export default function CheckoutScreen() {
   const kind: CartKind = params.kind === 'team' ? 'team' : 'individual';
   const { state, placeOrder } = useApp();
 
+  const { getProduct } = useProductsCtx();
   const memberCount = kind === 'team' ? state.team?.members.length ?? 0 : 0;
   const items = kind === 'team' ? state.cart.teamItems : state.cart.individualItems;
-  const summary = useMemo(() => summarize(items, memberCount), [items, memberCount]);
+  const summary = useMemo(() => summarize(items, getProduct, memberCount), [items, getProduct, memberCount]);
 
   const [address, setAddress] = useState('');
   const [delivery, setDelivery] = useState<string>(DELIVERY_METHODS[0].id);
@@ -53,6 +55,7 @@ export default function CheckoutScreen() {
   const placeLocalOrder = () =>
     placeOrder({
       kind,
+      status: 'confirmed',
       total: summary.finalTotal,
       city: state.profile?.city ?? 'Алматы',
       address: address.trim(),
@@ -109,7 +112,7 @@ export default function CheckoutScreen() {
         }
       } else {
         WebBrowser.openAuthSessionAsync(init.invoiceUrl, 'https://example.com/checkout/')
-          .then((b) => console.log('[pay] browser closed', b))
+          .then((b: unknown) => console.log('[pay] browser closed', b))
           .catch(() => {});
       }
 

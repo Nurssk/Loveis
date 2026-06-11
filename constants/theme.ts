@@ -5,38 +5,45 @@
 import { Platform, TextStyle, ViewStyle } from 'react-native';
 
 export const colors = {
-  // Brand
-  primary: '#FF5A1F', // strong warm accent
-  primaryDark: '#E64715',
-  primarySoft: '#FFF1EB',
+  // Brand — single coral voltage (Airbnb "Rausch"). Used scarcely: primary CTA,
+  // active tab, save state, brand mark. ~90% of every screen is white + ink.
+  primary: '#FF385C',
+  primaryDark: '#E00B41', // press / pointer-down
+  primarySoft: '#FFE8EC', // pale tint fill (soft buttons, selected chips, badges)
 
-  // Backgrounds
-  background: '#FBFAF8', // warm neutral
+  // Backgrounds / surfaces
+  background: '#FFFFFF',
   surface: '#FFFFFF',
-  surfaceAlt: '#F4F2EE',
+  surfaceAlt: '#F7F7F7', // soft fill — fields, filter bands, hover
+  surfaceStrong: '#F2F2F2', // steppers, segmented track, icon-button fill
 
-  // Text
-  text: '#1A1A1E',
-  textSecondary: '#6B6B72',
-  textMuted: '#9A9AA2',
+  // Text — never pure black
+  text: '#222222', // ink — headlines, body, prices, star rating
+  textSecondary: '#6A6A6A', // muted — subtitles, meta, inactive tabs
+  textMuted: '#929292', // muted-soft — disabled / faint
   textInverse: '#FFFFFF',
 
   // Lines / borders
-  border: '#ECE9E3',
-  borderStrong: '#DCD8D0',
+  border: '#DDDDDD', // hairline
+  borderStrong: '#C1C1C1',
+
+  // Savings axis — SCOPED green. Only quantifies a saving: discount %, team
+  // price, "you save X", progress fill. Never a CTA, never decorative.
+  success: '#1FA463', // savings
+  successSoft: '#E6F6EE', // savings-soft (pill / banner background)
+  savingsDeep: '#137A48', // legible text on savings-soft
 
   // States
-  success: '#1FA463',
-  successSoft: '#E6F6EE',
-  warning: '#E6A700',
-  danger: '#E5484D',
-  dangerSoft: '#FCEBEC',
-  info: '#2F6FED',
-  infoSoft: '#EAF1FE',
+  warning: '#B86700', // demo / jury / "simulated" affordances
+  warningSoft: '#FBF1DD',
+  danger: '#C13515', // form errors + destructive — distinct from coral
+  dangerSoft: '#FDECE4',
+  info: '#222222', // info uses ink, not blue (Airbnb discipline)
+  infoSoft: '#F2F2F2',
 
   // Misc
-  star: '#F5A623',
-  overlay: 'rgba(20,20,24,0.45)',
+  star: '#222222', // ratings render in ink, not gold — deliberate
+  overlay: 'rgba(0,0,0,0.5)', // modal / sheet scrim
 } as const;
 
 export const spacing = {
@@ -50,22 +57,37 @@ export const spacing = {
 } as const;
 
 export const radii = {
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 22,
+  sm: 8, // buttons, inputs, small banners
+  md: 14, // cards, product photos — the marketplace default
+  lg: 20, // large cards, sheet headers
+  xl: 28, // bottom-sheet top corners
   pill: 999,
 } as const;
 
+// Inter (the open substitute for Airbnb Cereal — full Cyrillic coverage). Each
+// weight is its own loaded family, so the glyph weight is exact on web + native;
+// fontWeight is kept only as a fallback for any text that misses a family.
+export const fonts = {
+  regular: 'Inter_400Regular',
+  medium: 'Inter_500Medium',
+  semibold: 'Inter_600SemiBold',
+  bold: 'Inter_700Bold',
+  extrabold: 'Inter_800ExtraBold',
+} as const;
+
+// Modest weights (Airbnb leans on photography, not typographic muscle). The one
+// loud moment is `savingsHero` — the group-buy price-drop number.
 export const typography = {
-  display: { fontSize: 30, fontWeight: '800', letterSpacing: -0.5 } as TextStyle,
-  h1: { fontSize: 24, fontWeight: '800', letterSpacing: -0.3 } as TextStyle,
-  h2: { fontSize: 20, fontWeight: '700', letterSpacing: -0.2 } as TextStyle,
-  h3: { fontSize: 17, fontWeight: '700' } as TextStyle,
-  body: { fontSize: 15, fontWeight: '500' } as TextStyle,
-  bodyStrong: { fontSize: 15, fontWeight: '700' } as TextStyle,
-  caption: { fontSize: 13, fontWeight: '500' } as TextStyle,
-  small: { fontSize: 11, fontWeight: '600' } as TextStyle,
+  savingsHero: { fontFamily: fonts.bold, fontSize: 40, fontWeight: '700', letterSpacing: -0.5 } as TextStyle,
+  display: { fontFamily: fonts.bold, fontSize: 28, fontWeight: '700', letterSpacing: -0.3 } as TextStyle,
+  h1: { fontFamily: fonts.semibold, fontSize: 24, fontWeight: '600', letterSpacing: -0.3 } as TextStyle,
+  h2: { fontFamily: fonts.semibold, fontSize: 20, fontWeight: '600', letterSpacing: -0.2 } as TextStyle,
+  h3: { fontFamily: fonts.semibold, fontSize: 17, fontWeight: '600' } as TextStyle,
+  body: { fontFamily: fonts.regular, fontSize: 15, fontWeight: '400' } as TextStyle,
+  bodyStrong: { fontFamily: fonts.semibold, fontSize: 15, fontWeight: '600' } as TextStyle,
+  caption: { fontFamily: fonts.regular, fontSize: 13, fontWeight: '400' } as TextStyle,
+  captionStrong: { fontFamily: fonts.semibold, fontSize: 13, fontWeight: '600' } as TextStyle,
+  small: { fontFamily: fonts.semibold, fontSize: 11, fontWeight: '600' } as TextStyle,
 } as const;
 
 export const shadows: Record<'card' | 'floating', ViewStyle> = {

@@ -37,7 +37,8 @@ export function AppInput({ label, error, leftIcon, password, style, ...rest }: P
           <Ionicons name={leftIcon} size={18} color={colors.textMuted} style={styles.leftIcon} />
         ) : null}
         <TextInput
-          style={[styles.input, style]}
+          {...rest}
+          style={[styles.input, styles.noOutline, style]}
           placeholderTextColor={colors.textMuted}
           secureTextEntry={password ? hidden : rest.secureTextEntry}
           onFocus={(e) => {
@@ -48,7 +49,6 @@ export function AppInput({ label, error, leftIcon, password, style, ...rest }: P
             setFocused(false);
             rest.onBlur?.(e);
           }}
-          {...rest}
         />
         {password ? (
           <Pressable
@@ -68,20 +68,22 @@ export function AppInput({ label, error, leftIcon, password, style, ...rest }: P
 
 const styles = StyleSheet.create({
   wrapper: { width: '100%', marginBottom: spacing.md },
-  label: { ...typography.caption, color: colors.textSecondary, marginBottom: spacing.xs },
+  label: { ...typography.captionStrong, color: colors.textSecondary, marginBottom: spacing.xs },
   field: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.surface,
     borderWidth: 1.5,
     borderColor: colors.border,
-    borderRadius: radii.md,
+    borderRadius: radii.sm,
     paddingHorizontal: spacing.md,
-    minHeight: 52,
+    minHeight: 54,
   },
-  focused: { borderColor: colors.primary },
+  focused: { borderColor: colors.text, borderWidth: 2 },
   errored: { borderColor: colors.danger },
   leftIcon: { marginRight: spacing.sm },
   input: { flex: 1, ...typography.body, color: colors.text, paddingVertical: spacing.md },
+  // Removes the browser's native blue focus ring on web (react-native-web).
+  noOutline: { outlineStyle: 'none' } as object,
   error: { ...typography.caption, color: colors.danger, marginTop: spacing.xs },
 });
