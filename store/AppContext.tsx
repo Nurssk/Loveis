@@ -52,7 +52,7 @@ type AppContextValue = {
   state: State;
   // auth
   login: (phone: string) => void;
-  verify: () => void;
+  verify: (uid?: string) => void;
   setInterests: (ids: string[]) => void;
   updateProfile: (patch: Partial<UserProfile>) => void;
   logout: () => void;
@@ -138,11 +138,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         dispatch({ type: 'SET', payload: { profile } });
       },
 
-      verify: () => {
+      verify: (uid) => {
         if (!state.profile) return;
         dispatch({
           type: 'SET',
-          payload: { profile: { ...state.profile, isVerified: true, deviceId: state.profile.deviceId || randomDeviceId() } },
+          payload: { profile: { ...state.profile, isVerified: true, deviceId: uid || state.profile.deviceId || randomDeviceId() } },
         });
       },
 

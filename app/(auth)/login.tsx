@@ -8,6 +8,7 @@ import { Logo } from '@/components/Logo';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { useToast } from '@/components/Toast';
 import { colors, spacing, typography } from '@/constants/theme';
+import { RECAPTCHA_CONTAINER_ID, sendOtp } from '@/lib/phoneAuth';
 import { useApp } from '@/store/AppContext';
 import { formatPhoneInput, isValidKzPhone, normalizePhone } from '@/utils/format';
 
@@ -19,6 +20,7 @@ export default function LoginScreen() {
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [touched, setTouched] = useState(false);
+  const [sending, setSending] = useState(false);
 
   const phoneOk = isValidKzPhone(phone);
   const passwordOk = password.length >= 6;
@@ -31,12 +33,21 @@ export default function LoginScreen() {
 
   const passwordError = touched && password.length > 0 && !passwordOk ? 'Минимум 6 символов' : null;
 
-  const onSubmit = () => {
+  const onSubmit = async () => {
     setTouched(true);
-    if (!canSubmit) return;
+    if (!canSubmit || sending) return;
     Keyboard.dismiss();
-    login(normalizePhone(phone));
-    router.replace('/(auth)/sms-verification');
+    const e164 = normalizePhone(phone);
+    try {
+      setSending(true);
+      login(e164);
+      await sendOtp(e164);
+      router.replace('/(auth)/sms-verification');
+    } catch (e) {
+      toast.show(e instanceof Error ? e.message : 'Не удалось отправить код', 'error');
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -82,7 +93,12 @@ export default function LoginScreen() {
             <Text style={styles.forgotText}>Забыли пароль?</Text>
           </Pressable>
 
-          <AppButton title="Войти" onPress={onSubmit} disabled={!canSubmit} icon="log-in-outline" />
+          <AppButton
+            title={sending ? 'Отправляем код…' : 'Войти'}
+            onPress={onSubmit}
+            disabled={!canSubmit || sending}
+            icon="log-in-outline"
+          />
 
           <View style={styles.divider}>
             <View style={styles.line} />
@@ -94,8 +110,11 @@ export default function LoginScreen() {
             title="Зарегистрироваться"
             variant="secondary"
             onPress={onSubmit}
-            disabled={!canSubmit}
+            disabled={!canSubmit || sending}
           />
+
+          {/* Invisible reCAPTCHA mount point (web only; renders a <div>). */}
+          <View nativeID={RECAPTCHA_CONTAINER_ID} />
         </View>
 
         <Text style={styles.hint}>
