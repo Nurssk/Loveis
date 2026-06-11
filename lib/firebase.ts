@@ -12,6 +12,7 @@
  * access is controlled by Firestore security rules, not by hiding the keys.
  */
 import { FirebaseApp, getApp, getApps, initializeApp } from 'firebase/app';
+import { Auth, getAuth } from 'firebase/auth';
 import { Firestore, getFirestore, initializeFirestore } from 'firebase/firestore';
 
 const firebaseConfig = {
@@ -30,6 +31,7 @@ export const isFirebaseConfigured = Boolean(
 
 let app: FirebaseApp | null = null;
 let firestore: Firestore | null = null;
+let firebaseAuth: Auth | null = null;
 
 if (isFirebaseConfigured) {
   if (getApps().length) {
@@ -41,9 +43,17 @@ if (isFirebaseConfigured) {
     // default streaming transport can stall behind some networks.
     firestore = initializeFirestore(app, { experimentalForceLongPolling: true });
   }
+
+  // On web this uses browserLocalPersistence (session survives reloads). Native
+  // phone auth isn't supported via the JS SDK here — see lib/phoneAuth.ts.
+  // Real reCAPTCHA verification runs in all modes (Blaze + real SMS).
+  firebaseAuth = getAuth(app);
 }
 
 /** Firestore instance, or `null` until the team wires up the Firebase config. */
 export const db = firestore;
+
+/** Auth instance, or `null` until the Firebase config is provided. */
+export const auth = firebaseAuth;
 
 export default app;

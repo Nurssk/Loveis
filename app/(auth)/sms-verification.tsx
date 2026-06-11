@@ -6,10 +6,11 @@ import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { AppButton } from '@/components/AppButton';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { colors, radii, shadows, spacing, typography } from '@/constants/theme';
+import { confirmOtp, resetOtp, sendOtp } from '@/lib/phoneAuth';
 import { useApp } from '@/store/AppContext';
 import { maskPhone } from '@/utils/format';
 
-const DEMO_CODE = '1234';
+const CODE_LENGTH = 6;
 const RESEND_SECONDS = 30;
 
 export default function SmsVerificationScreen() {
@@ -21,6 +22,7 @@ export default function SmsVerificationScreen() {
   const [error, setError] = useState<string | null>(null);
   const [seconds, setSeconds] = useState(RESEND_SECONDS);
   const [success, setSuccess] = useState(false);
+  const [verifying, setVerifying] = useState(false);
 
   const phone = state.profile?.phone ?? '';
 
@@ -30,26 +32,36 @@ export default function SmsVerificationScreen() {
     return () => clearInterval(id);
   }, [seconds]);
 
-  const cells = useMemo(() => Array.from({ length: 4 }, (_, i) => code[i] ?? ''), [code]);
+  const cells = useMemo(() => Array.from({ length: CODE_LENGTH }, (_, i) => code[i] ?? ''), [code]);
 
-  const onConfirm = () => {
-    if (code.length < 4) {
-      setError('Введите 4-значный код');
+  const onConfirm = async () => {
+    if (code.length < CODE_LENGTH) {
+      setError(`Введите ${CODE_LENGTH}-значный код`);
       return;
     }
-    if (code !== DEMO_CODE) {
-      setError('Неверный код. Подсказка: используйте 1234');
-      return;
+    if (verifying) return;
+    try {
+      setVerifying(true);
+      setError(null);
+      const uid = await confirmOtp(code);
+      verify(uid);
+      setSuccess(true);
+    } catch {
+      setError('Неверный код. Проверьте SMS и попробуйте снова.');
+    } finally {
+      setVerifying(false);
     }
-    setError(null);
-    verify();
-    setSuccess(true);
   };
 
-  const onResend = () => {
-    setSeconds(RESEND_SECONDS);
+  const onResend = async () => {
     setCode('');
     setError(null);
+    try {
+      await sendOtp(phone);
+      setSeconds(RESEND_SECONDS);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Не удалось отправить код повторно');
+    }
   };
 
   if (success) {
@@ -90,7 +102,7 @@ export default function SmsVerificationScreen() {
 
   return (
     <ScreenContainer>
-      <Pressable onPress={() => router.back()} style={styles.back} hitSlop={10} accessibilityLabel="Назад" accessibilityRole="button">
+      <Pressable onPress={() => { resetOtp(); router.replace('/(auth)/login'); }} style={styles.back} hitSlop={10} accessibilityLabel="Назад" accessibilityRole="button">
         <Ionicons name="chevron-back" size={26} color={colors.text} />
       </Pressable>
 
@@ -119,10 +131,10 @@ export default function SmsVerificationScreen() {
         value={code}
         onChangeText={(t) => {
           setError(null);
-          setCode(t.replace(/\D/g, '').slice(0, 4));
+          setCode(t.replace(/\D/g, '').slice(0, CODE_LENGTH));
         }}
         keyboardType="number-pad"
-        maxLength={4}
+        maxLength={CODE_LENGTH}
         autoFocus
         style={styles.hiddenInput}
         accessibilityLabel="Код из СМС"
@@ -132,7 +144,9 @@ export default function SmsVerificationScreen() {
 
       <View style={styles.demoHint}>
         <Ionicons name="information-circle-outline" size={16} color={colors.info} />
-        <Text style={styles.demoHintText}>Демо-код для жюри: {DEMO_CODE}</Text>
+        <Text style={styles.demoHintText}>
+          Код придёт по SMS. Для тестовых номеров используйте код из Firebase Console.
+        </Text>
       </View>
 
       <View style={styles.resendRow}>
@@ -145,7 +159,7 @@ export default function SmsVerificationScreen() {
         )}
       </View>
 
-      <AppButton title="Подтвердить" onPress={onConfirm} disabled={code.length < 4} style={styles.confirmBtn} />
+      <AppButton title={verifying ? 'Проверяем…' : 'Подтвердить'} onPress={onConfirm} disabled={code.length < CODE_LENGTH || verifying} style={styles.confirmBtn} />
     </ScreenContainer>
   );
 }
