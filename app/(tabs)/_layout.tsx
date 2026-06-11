@@ -1,9 +1,10 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Tabs } from 'expo-router';
 import React from 'react';
-import { ColorValue, Platform, StyleSheet, Text, View } from 'react-native';
+import { ColorValue, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { colors, LAYOUT, typography } from '@/constants/theme';
+import { colors, fonts, LAYOUT, typography } from '@/constants/theme';
 import { useApp } from '@/store/AppContext';
 import { lineCount } from '@/utils/cart';
 
@@ -23,13 +24,15 @@ function CartIcon({ color, size }: { color: ColorValue; size: number }) {
 }
 
 export default function TabsLayout() {
+  const insets = useSafeAreaInsets();
+  const bottom = Math.max(insets.bottom, 10);
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textMuted,
-        tabBarStyle: styles.tabBar,
+        tabBarStyle: [styles.tabBar, { height: 60 + bottom, paddingBottom: bottom }],
         tabBarLabelStyle: styles.label,
         tabBarItemStyle: styles.item,
         sceneStyle: { backgroundColor: colors.background },
@@ -77,15 +80,13 @@ const styles = StyleSheet.create({
   tabBar: {
     backgroundColor: colors.surface,
     borderTopColor: colors.border,
-    height: Platform.OS === 'ios' ? 86 : 64,
-    paddingTop: 6,
-    paddingBottom: Platform.OS === 'ios' ? 28 : 8,
+    paddingTop: 8,
     maxWidth: LAYOUT.maxContentWidth,
     alignSelf: 'center',
     width: '100%',
   },
   item: { paddingTop: 2 },
-  label: { ...typography.small, marginTop: 2 },
+  label: { ...typography.small, lineHeight: 14, marginTop: 3 },
   badge: {
     position: 'absolute',
     top: -6,
@@ -98,5 +99,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  badgeText: { color: colors.textInverse, fontSize: 10, fontWeight: '800' },
+  badgeText: { color: colors.textInverse, fontFamily: fonts.extrabold, fontSize: 10, fontWeight: '800' },
 });

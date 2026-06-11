@@ -131,7 +131,7 @@ export default function SmsVerificationScreen() {
       {error ? <Text style={styles.error}>{error}</Text> : null}
 
       <View style={styles.demoHint}>
-        <Ionicons name="information-circle-outline" size={16} color={colors.info} />
+        <Ionicons name="flask-outline" size={16} color={colors.warning} />
         <Text style={styles.demoHintText}>Демо-код для жюри: {DEMO_CODE}</Text>
       </View>
 
@@ -161,7 +161,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginTop: spacing.lg,
   },
-  title: { ...typography.h1, color: colors.text, marginTop: spacing.lg },
+  title: { ...typography.display, color: colors.text, marginTop: spacing.lg },
   subtitle: { ...typography.body, color: colors.textSecondary, marginTop: spacing.sm, lineHeight: 22 },
   phone: { color: colors.text, fontWeight: '700' },
   cells: { flexDirection: 'row', gap: spacing.md, marginTop: spacing.xxl },
@@ -184,12 +184,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
-    backgroundColor: colors.infoSoft,
+    backgroundColor: colors.warningSoft,
     borderRadius: radii.sm,
     padding: spacing.md,
     marginTop: spacing.lg,
   },
-  demoHintText: { ...typography.caption, color: colors.info, fontWeight: '700' },
+  demoHintText: { ...typography.caption, color: colors.warning, fontWeight: '700' },
   resendRow: { marginTop: spacing.lg, alignItems: 'center' },
   timer: { ...typography.caption, color: colors.textMuted },
   resend: { ...typography.caption, color: colors.primary, fontWeight: '700' },

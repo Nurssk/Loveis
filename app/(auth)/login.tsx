@@ -1,12 +1,10 @@
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { Keyboard, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Keyboard, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
 
 import { AppButton } from '@/components/AppButton';
 import { AppInput } from '@/components/AppInput';
-import { Logo } from '@/components/Logo';
 import { ScreenContainer } from '@/components/ScreenContainer';
-import { useToast } from '@/components/Toast';
 import { colors, spacing, typography } from '@/constants/theme';
 import { useApp } from '@/store/AppContext';
 import { formatPhoneInput, isValidKzPhone, normalizePhone } from '@/utils/format';
@@ -14,7 +12,6 @@ import { formatPhoneInput, isValidKzPhone, normalizePhone } from '@/utils/format
 export default function LoginScreen() {
   const router = useRouter();
   const { login } = useApp();
-  const toast = useToast();
 
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
@@ -42,18 +39,17 @@ export default function LoginScreen() {
   return (
     <ScreenContainer>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={styles.top}>
-          <Logo />
+        {/* Brand + headline */}
+        <View style={styles.brand}>
+          <Text style={styles.headline}>Добро пожаловать</Text>
+          <Text style={styles.description}>
+            Покупайте командой и экономьте до 30% на каждом заказе. Войдите по номеру телефона, чтобы начать.
+          </Text>
         </View>
 
-        <Text style={styles.title}>Добро пожаловать</Text>
-        <Text style={styles.subtitle}>
-          Покупайте вместе и экономьте до 30%. Войдите по номеру телефона, чтобы начать.
-        </Text>
-
+        {/* Inputs */}
         <View style={styles.form}>
           <AppInput
-            label="Номер телефона"
             leftIcon="call-outline"
             placeholder="+7 (7__) ___ __ __"
             keyboardType="phone-pad"
@@ -64,24 +60,18 @@ export default function LoginScreen() {
             maxLength={18}
           />
           <AppInput
-            label="Пароль"
             leftIcon="lock-closed-outline"
-            placeholder="Минимум 6 символов"
+            placeholder="Пароль (минимум 6 символов)"
             password
             value={password}
             onChangeText={setPassword}
             error={passwordError}
             autoCapitalize="none"
           />
+        </View>
 
-          <Pressable
-            onPress={() => toast.show('Демо-режим: восстановление пароля недоступно', 'info')}
-            style={styles.forgot}
-            accessibilityRole="button"
-          >
-            <Text style={styles.forgotText}>Забыли пароль?</Text>
-          </Pressable>
-
+        {/* Buttons */}
+        <View style={styles.actions}>
           <AppButton title="Войти" onPress={onSubmit} disabled={!canSubmit} icon="log-in-outline" />
 
           <View style={styles.divider}>
@@ -90,12 +80,7 @@ export default function LoginScreen() {
             <View style={styles.line} />
           </View>
 
-          <AppButton
-            title="Зарегистрироваться"
-            variant="secondary"
-            onPress={onSubmit}
-            disabled={!canSubmit}
-          />
+          <AppButton title="Создать аккаунт" variant="secondary" onPress={onSubmit} disabled={!canSubmit} />
         </View>
 
         <Text style={styles.hint}>
@@ -107,14 +92,19 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  top: { alignItems: 'center', marginTop: spacing.xxxl, marginBottom: spacing.xxl },
-  title: { ...typography.display, color: colors.text, marginTop: spacing.sm },
-  subtitle: { ...typography.body, color: colors.textSecondary, marginTop: spacing.sm, lineHeight: 22 },
-  form: { marginTop: spacing.xxl },
-  forgot: { alignSelf: 'flex-end', marginBottom: spacing.lg, paddingVertical: spacing.xs },
-  forgotText: { ...typography.caption, color: colors.primary, fontWeight: '700' },
+  brand: { alignItems: 'center', marginTop: spacing.xxxl, marginBottom: spacing.xxl },
+  headline: { ...typography.display, color: colors.text, textAlign: 'center', marginTop: spacing.lg },
+  description: {
+    ...typography.body,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginTop: spacing.sm,
+  },
+  form: { marginBottom: spacing.lg },
+  actions: {},
   divider: { flexDirection: 'row', alignItems: 'center', marginVertical: spacing.lg },
-  line: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.borderStrong },
+  line: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
   dividerText: { ...typography.caption, color: colors.textMuted, marginHorizontal: spacing.md },
-  hint: { ...typography.caption, color: colors.textMuted, textAlign: 'center', marginTop: spacing.xl },
+  hint: { ...typography.caption, color: colors.textMuted, textAlign: 'center', marginTop: spacing.xxl },
 });

@@ -3,19 +3,16 @@ import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 
-import { Avatar } from '@/components/AvatarGroup';
 import { CategoryChip } from '@/components/CategoryChip';
 import { EmptyState } from '@/components/EmptyState';
 import { ProductCard } from '@/components/ProductCard';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { SectionHeader } from '@/components/SectionHeader';
-import { useToast } from '@/components/Toast';
 import { CATEGORIES, categoryLabel } from '@/data/categories';
 import { getProduct } from '@/data/products';
 import { colors, radii, spacing, typography } from '@/constants/theme';
 import { useApp } from '@/store/AppContext';
 import { Product } from '@/types';
-import { lineCount } from '@/utils/cart';
 import { itemWord } from '@/utils/format';
 import { bestSavings, popularTeamPurchases, recommendedProducts, searchProducts } from '@/utils/recommendations';
 
@@ -29,7 +26,6 @@ function greeting(): string {
 
 export default function HomeScreen() {
   const router = useRouter();
-  const toast = useToast();
   const { state } = useApp();
 
   const [query, setQuery] = useState('');
@@ -55,11 +51,7 @@ export default function HomeScreen() {
   }, [filtering, query, category]);
 
   const renderShelf = (items: Product[], reasons?: Record<string, string>) => (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.shelf}
-    >
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.shelf}>
       {items.map((p) => (
         <ProductCard
           key={p.id}
@@ -74,39 +66,23 @@ export default function HomeScreen() {
 
   return (
     <ScreenContainer padded={false} edges={['top']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Text style={styles.greeting}>{greeting()},</Text>
-          <View style={styles.cityRow}>
-            <Ionicons name="location-outline" size={15} color={colors.primary} />
-            <Text style={styles.city}>{state.profile?.city ?? 'Алматы'}</Text>
-          </View>
-        </View>
-        <View style={styles.headerRight}>
-          <Pressable
-            onPress={() => toast.show('Новых уведомлений нет', 'info')}
-            style={styles.iconBtn}
-            accessibilityRole="button"
-            accessibilityLabel="Уведомления"
-          >
-            <Ionicons name="notifications-outline" size={22} color={colors.text} />
-            <View style={styles.dot} />
-          </Pressable>
-          <Pressable onPress={() => router.push('/(tabs)/profile')} accessibilityRole="button" accessibilityLabel="Профиль">
-            <Avatar name={state.profile?.name ?? 'Вы'} size={40} />
-          </Pressable>
+      {/* Greeting */}
+      <View style={styles.greetingBlock}>
+        <Text style={styles.greeting}>{greeting()},</Text>
+        <View style={styles.cityRow}>
+          <Ionicons name="location-outline" size={15} color={colors.primary} />
+          <Text style={styles.city}>{state.profile?.city ?? 'Алматы'}</Text>
         </View>
       </View>
 
       {/* Search */}
       <View style={styles.searchRow}>
         <View style={styles.search}>
-          <Ionicons name="search" size={18} color={colors.textMuted} />
+          <Ionicons name="search" size={18} color={colors.text} />
           <TextInput
             value={query}
             onChangeText={setQuery}
-            placeholder="Поиск товаров, категорий, магазинов"
+            placeholder="Поиск товаров и магазинов"
             placeholderTextColor={colors.textMuted}
             style={styles.searchInput}
             returnKeyType="search"
@@ -124,11 +100,11 @@ export default function HomeScreen() {
           accessibilityRole="button"
           accessibilityLabel="Сбросить фильтр"
         >
-          <Ionicons name="options-outline" size={20} color={category ? colors.textInverse : colors.text} />
+          <Ionicons name="options-outline" size={20} color={category ? colors.primaryDark : colors.text} />
         </Pressable>
       </View>
 
-      {/* Category chips */}
+      {/* Category strip */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
         <CategoryChip label="Все" selected={category === null} onPress={() => setCategory(null)} />
         {CATEGORIES.map((c) => (
@@ -168,23 +144,8 @@ export default function HomeScreen() {
         </View>
       ) : (
         <View style={styles.feed}>
-          {state.cart.individualItems.length + state.cart.teamItems.length > 0 ? (
-            <Pressable style={styles.cartBanner} onPress={() => router.push('/(tabs)/cart')} accessibilityRole="button">
-              <Ionicons name="cart" size={20} color={colors.primaryDark} />
-              <Text style={styles.cartBannerText}>
-                В корзине {lineCount(state.cart.individualItems) + lineCount(state.cart.teamItems)}{' '}
-                {itemWord(lineCount(state.cart.individualItems) + lineCount(state.cart.teamItems))}
-              </Text>
-              <Ionicons name="chevron-forward" size={18} color={colors.primaryDark} />
-            </Pressable>
-          ) : null}
-
           <View style={styles.padX}>
-            <SectionHeader
-              title="Рекомендации для вас"
-              subtitle="Подобрано по вашим интересам"
-              icon="sparkles"
-            />
+            <SectionHeader title="Рекомендации для вас" subtitle="Подобрано по вашим интересам" icon="sparkles" />
           </View>
           {renderShelf(
             recos.map((r) => r.product),
@@ -192,29 +153,19 @@ export default function HomeScreen() {
           )}
 
           <View style={styles.padX}>
-            <SectionHeader
-              title="Популярно в команде"
-              subtitle="Чаще всего покупают вместе"
-              icon="flame"
-              iconColor={colors.danger}
-            />
+            <SectionHeader title="Популярно в команде" subtitle="Чаще всего покупают вместе" icon="flame" iconColor={colors.danger} />
           </View>
           {renderShelf(popular)}
 
           <View style={styles.padX}>
-            <SectionHeader
-              title="Лучшая экономия"
-              subtitle="Максимальная выгода при покупке командой"
-              icon="trending-down"
-              iconColor={colors.success}
-            />
+            <SectionHeader title="Лучшая экономия" subtitle="Максимальная выгода при покупке командой" icon="trending-down" iconColor={colors.success} />
           </View>
           {renderShelf(savings)}
 
           {recent.length > 0 ? (
             <>
               <View style={styles.padX}>
-                <SectionHeader title="Вы недавно смотрели" icon="time-outline" iconColor={colors.info} />
+                <SectionHeader title="Вы недавно смотрели" icon="time-outline" />
               </View>
               {renderShelf(recent)}
             </>
@@ -226,22 +177,19 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
-  header: {
+  topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
-    paddingBottom: spacing.md,
   },
-  headerLeft: {},
+  greetingBlock: { paddingHorizontal: spacing.lg, marginTop: spacing.md },
   greeting: { ...typography.caption, color: colors.textSecondary },
   cityRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 },
-  city: { ...typography.h3, color: colors.text },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  iconBtn: { padding: 4 },
-  dot: { position: 'absolute', top: 4, right: 4, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary },
-  searchRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.lg },
+  city: { ...typography.h2, color: colors.text },
+
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.lg, marginTop: spacing.lg },
   search: {
     flex: 1,
     flexDirection: 'row',
@@ -250,35 +198,59 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1.5,
     borderColor: colors.border,
-    borderRadius: radii.md,
-    paddingHorizontal: spacing.md,
-    minHeight: 50,
+    borderRadius: radii.pill,
+    paddingHorizontal: spacing.lg,
+    minHeight: 52,
   },
   searchInput: { flex: 1, ...typography.body, color: colors.text },
   filterBtn: {
-    width: 50,
-    height: 50,
-    borderRadius: radii.md,
+    width: 52,
+    height: 52,
+    borderRadius: radii.pill,
     borderWidth: 1.5,
     borderColor: colors.border,
     backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  filterBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  chips: { gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
+  filterBtnActive: { backgroundColor: colors.primarySoft, borderColor: colors.primarySoft },
+
+  chips: { gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: spacing.lg },
   feed: {},
   padX: { paddingHorizontal: spacing.lg },
   shelf: { gap: spacing.md, paddingHorizontal: spacing.lg, paddingBottom: spacing.sm },
   results: { paddingHorizontal: spacing.lg, paddingTop: spacing.xs },
   resultsCount: { ...typography.caption, color: colors.textSecondary, marginBottom: spacing.md },
   list: { gap: spacing.md },
+
+  promo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radii.md,
+    backgroundColor: colors.successSoft,
+  },
+  promoIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: radii.pill,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  promoBody: { flex: 1 },
+  promoTitle: { ...typography.bodyStrong, color: colors.savingsDeep },
+  promoText: { ...typography.caption, color: colors.savingsDeep, marginTop: 1 },
+
   cartBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
     marginHorizontal: spacing.lg,
-    marginTop: spacing.sm,
+    marginBottom: spacing.sm,
     padding: spacing.md,
     borderRadius: radii.md,
     backgroundColor: colors.primarySoft,

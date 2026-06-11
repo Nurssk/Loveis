@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
 import { Badge } from '@/components/Badge';
+import { CheckList } from '@/components/CheckList';
 import { EmptyState } from '@/components/EmptyState';
 import { ProductImage } from '@/components/ProductImage';
 import { Rating } from '@/components/Rating';
@@ -120,18 +121,16 @@ export default function ProductDetailScreen() {
               </View>
             </View>
 
-            <View style={styles.priceDivider} />
-
-            <View style={styles.priceTop}>
-              <View>
-                <Text style={[styles.priceLabel, { color: colors.success }]}>
-                  Цена в команде {hasTeam ? `(${teamSize} ${memberWord(teamSize)})` : `(пример: ${teamSize})`}
-                </Text>
+            <View style={styles.teamBlock}>
+              <Text style={styles.teamLabel}>
+                Цена в команде {hasTeam ? `(${teamSize} ${memberWord(teamSize)})` : `(пример: ${teamSize})`}
+              </Text>
+              <View style={styles.teamRow}>
                 <Text style={styles.teamPrice}>{formatPrice(tPrice)}</Text>
-              </View>
-              <View style={styles.savingsBox}>
-                <Text style={styles.savingsLabel}>Экономия</Text>
-                <Text style={styles.savingsValue}>{formatPrice(savings)}</Text>
+                <View style={styles.savingsBox}>
+                  <Text style={styles.savingsLabel}>Вы экономите</Text>
+                  <Text style={styles.savingsValue}>{formatPrice(savings)}</Text>
+                </View>
               </View>
             </View>
 
@@ -142,6 +141,18 @@ export default function ProductDetailScreen() {
               </Text>
             </View>
           </View>
+
+          <Text style={styles.sectionTitle}>Что входит</Text>
+          <CheckList
+            items={[
+              `Доставка в ${product.city} — 2–4 дня`,
+              '−5% за каждого участника',
+              'До −30% в команде',
+              'Оплата Kaspi / Halyk / картой',
+              'Возврат в течение 14 дней',
+              'Гарантия качества',
+            ]}
+          />
         </View>
       </ScreenContainer>
 
@@ -229,11 +240,13 @@ const styles = StyleSheet.create({
   regularPrice: { ...typography.h3, color: colors.textMuted, textDecorationLine: 'line-through', marginTop: 2 },
   discountTag: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.success, paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: radii.pill },
   discountTagText: { ...typography.bodyStrong, color: colors.textInverse },
-  priceDivider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginVertical: spacing.md },
-  teamPrice: { ...typography.display, color: colors.text, marginTop: 2 },
+  teamBlock: { backgroundColor: colors.successSoft, borderRadius: radii.md, padding: spacing.md, marginTop: spacing.md },
+  teamLabel: { ...typography.captionStrong, color: colors.savingsDeep },
+  teamRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: spacing.xs },
+  teamPrice: { ...typography.savingsHero, color: colors.savingsDeep },
   savingsBox: { alignItems: 'flex-end' },
-  savingsLabel: { ...typography.caption, color: colors.textSecondary },
-  savingsValue: { ...typography.h3, color: colors.success, marginTop: 2 },
+  savingsLabel: { ...typography.caption, color: colors.savingsDeep },
+  savingsValue: { ...typography.h2, color: colors.success, marginTop: 2 },
   explain: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg, backgroundColor: colors.surfaceAlt, padding: spacing.md, borderRadius: radii.sm },
   explainText: { ...typography.caption, color: colors.textSecondary, flex: 1, lineHeight: 18 },
   actionBar: { backgroundColor: colors.surface, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },

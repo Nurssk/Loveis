@@ -195,7 +195,7 @@ function DemoAction({
 }
 
 const styles = StyleSheet.create({
-  h1: { ...typography.h1, color: colors.text, marginTop: spacing.sm, marginBottom: spacing.lg },
+  h1: { ...typography.display, color: colors.text, marginTop: spacing.sm, marginBottom: spacing.lg },
   card: {
     backgroundColor: colors.surface,
     borderRadius: radii.lg,

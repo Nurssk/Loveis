@@ -8,6 +8,7 @@ import QRCode from 'react-native-qrcode-svg';
 import { AppButton } from '@/components/AppButton';
 import { AppInput } from '@/components/AppInput';
 import { Avatar } from '@/components/AvatarGroup';
+import { CheckList } from '@/components/CheckList';
 import { ErrorMessage } from '@/components/ErrorMessage';
 import { SectionHeader } from '@/components/SectionHeader';
 import { ScreenContainer } from '@/components/ScreenContainer';
@@ -18,12 +19,6 @@ import { useApp } from '@/store/AppContext';
 import { summarize } from '@/utils/cart';
 import { MAX_DISCOUNT, nextDiscountThreshold, teamDiscountPercent } from '@/utils/discount';
 import { formatPrice, memberWord } from '@/utils/format';
-
-const BENEFITS = [
-  { icon: 'pricetags-outline', text: 'Скидка 5% за каждого участника команды' },
-  { icon: 'trending-down-outline', text: 'До 30% экономии на любом товаре' },
-  { icon: 'cube-outline', text: 'Одна общая доставка на всех' },
-];
 
 export default function TeamScreen() {
   const router = useRouter();
@@ -81,16 +76,15 @@ export default function TeamScreen() {
           Объединяйтесь с друзьями или соседями — и покупайте дешевле. Каждый участник снижает цену для всех.
         </Text>
 
-        <View style={styles.benefitsCard}>
-          {BENEFITS.map((b) => (
-            <View key={b.text} style={styles.benefitRow}>
-              <View style={styles.benefitIcon}>
-                <Ionicons name={b.icon as keyof typeof Ionicons.glyphMap} size={18} color={colors.primary} />
-              </View>
-              <Text style={styles.benefitText}>{b.text}</Text>
-            </View>
-          ))}
-        </View>
+        <Text style={styles.sectionTitle}>Что вы получите</Text>
+        <CheckList
+          items={[
+            'Скидка 5% за каждого участника',
+            'До 30% экономии на товарах',
+            'Одна общая доставка на всех',
+            'Чем больше команда — ниже цена',
+          ]}
+        />
 
         <AppButton title="Создать команду" icon="add" onPress={createTeam} style={styles.createBtn} />
 
@@ -228,6 +222,7 @@ export default function TeamScreen() {
 const styles = StyleSheet.create({
   h1: { ...typography.h1, color: colors.text, marginTop: spacing.sm },
   lead: { ...typography.body, color: colors.textSecondary, marginTop: spacing.xs, lineHeight: 22 },
+  sectionTitle: { ...typography.h3, color: colors.text, marginTop: spacing.xl, marginBottom: spacing.md },
   benefitsCard: {
     backgroundColor: colors.surface,
     borderRadius: radii.lg,
@@ -274,7 +269,7 @@ const styles = StyleSheet.create({
   },
   discountTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   discountLabel: { ...typography.caption, color: colors.textSecondary },
-  discountValue: { ...typography.display, color: colors.success, marginTop: 2 },
+  discountValue: { ...typography.savingsHero, color: colors.success, marginTop: 2 },
   discountBadge: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.success, paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: radii.pill },
   discountBadgeText: { ...typography.bodyStrong, color: colors.textInverse },
   progressTrack: { height: 8, borderRadius: radii.pill, backgroundColor: colors.surfaceAlt, marginTop: spacing.md, overflow: 'hidden' },
