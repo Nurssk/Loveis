@@ -1,10 +1,10 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
-import { colors, radii } from '@/constants/theme';
+import { colors, fonts, radii } from '@/constants/theme';
 import { TeamMember } from '@/types';
 
-const PALETTE = ['#FF5A1F', '#2F6FED', '#1FA463', '#7A5AF8', '#E5489B', '#0EA5A5'];
+const PALETTE = ['#FF385C', '#2F6FED', '#1FA463', '#7A5AF8', '#E5489B', '#0EA5A5'];
 
 function initials(name: string): string {
   const trimmed = name.trim();
@@ -53,5 +53,5 @@ const styles = StyleSheet.create({
     borderColor: colors.surface,
   },
   more: { backgroundColor: colors.surfaceAlt },
-  initials: { color: colors.textInverse, fontWeight: '800' },
+  initials: { color: colors.textInverse, fontFamily: fonts.extrabold, fontWeight: '800' },
 });

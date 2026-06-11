@@ -24,7 +24,7 @@ export default function SmsVerificationScreen() {
   const [success, setSuccess] = useState(false);
   const [verifying, setVerifying] = useState(false);
 
-  const phone = state.profile?.phone ?? '';
+  const phone = state.pendingPhone || state.profile?.phone || '';
 
   useEffect(() => {
     if (seconds <= 0) return;

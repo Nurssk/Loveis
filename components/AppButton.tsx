@@ -62,15 +62,15 @@ export function AppButton({
 
 const VARIANTS: Record<Variant, { bg: string; fg: string; border: string }> = {
   primary: { bg: colors.primary, fg: colors.textInverse, border: colors.primary },
-  secondary: { bg: colors.primarySoft, fg: colors.primaryDark, border: colors.primarySoft },
+  secondary: { bg: colors.surface, fg: colors.text, border: colors.borderStrong },
   ghost: { bg: 'transparent', fg: colors.text, border: colors.borderStrong },
   danger: { bg: colors.dangerSoft, fg: colors.danger, border: colors.dangerSoft },
 };
 
 const styles = StyleSheet.create({
   base: {
-    minHeight: 52,
-    borderRadius: radii.md,
+    minHeight: 46,
+    borderRadius: radii.sm,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -78,8 +78,8 @@ const styles = StyleSheet.create({
   },
   fullWidth: { alignSelf: 'stretch' },
   content: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center' },
-  icon: { marginRight: spacing.sm },
-  label: { ...typography.bodyStrong },
+  icon: { marginRight: spacing.xs },
+  label: { ...typography.bodyStrong, fontSize: 14 },
   pressed: { opacity: 0.85, transform: [{ scale: 0.99 }] },
   disabled: { opacity: 0.45 },
 });

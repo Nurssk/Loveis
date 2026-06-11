@@ -1,64 +1,90 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 import React, { createContext, useContext, useEffect, useMemo, useReducer } from 'react';
 
-import { joinDemoTeam, makeMember, DEMO_MEMBER_NAMES } from '@/data/teams';
-import { CartKind, CartState, Coupon, CouponType, Order, ShoppingTeam, UserProfile } from '@/types';
-import { orderNumber, randomDeviceId, randomTeamCode, uid } from '@/utils/ids';
+import { auth } from '@/lib/firebase';
+import * as ordersRepo from '@/lib/ordersRepo';
+import * as teamsRepo from '@/lib/teamsRepo';
+import { awardCoupon, createOrInitUser, subscribeToUser, updateUser } from '@/lib/usersRepo';
+import { CartItem, CartKind, CartState, Coupon, CouponType, Order, ShoppingTeam, TeamMember, UserProfile } from '@/types';
+import { orderNumber, uid } from '@/utils/ids';
+
+const DEMO_MEMBER_NAMES = ['Алия', 'Нуржан', 'Данияр', 'Аружан', 'Ербол', 'Сабина'];
 
 const TEAM_MAX_MEMBERS = 6;
+const LOCAL_STORAGE_KEY = 'birge.local.v1';
 
-const COUPON_CATALOG: Record<CouponType, Omit<Coupon, 'id' | 'earnedAt' | 'usedAt'>> = {
-  newcomer:       { type: 'newcomer',       title: 'Новичок',         description: 'За вступление в команду',            discount: 3 },
-  team_player:    { type: 'team_player',    title: 'Командный игрок', description: 'Команда 3+ участника',               discount: 5 },
-  first_purchase: { type: 'first_purchase', title: 'Первая покупка',  description: 'Первый товар в командной корзине',   discount: 2 },
-};
+// ─── State ──────────────────────────────────────────────────────────────────
 
-const STORAGE_KEY = 'birge.state.v1';
-
-type PersistedState = {
-  profile: UserProfile | null;
+type LocalState = {
   team: ShoppingTeam | null;
   cart: CartState;
   recentlyViewed: string[];
   lastOrder: Order | null;
-  coupons: Coupon[];
-  teamOrders: Order[];
   savedProducts: string[];
 };
 
-type State = PersistedState & { hydrated: boolean };
+type State = LocalState & {
+  uid: string | null;
+  pendingPhone: string;
+  profile: UserProfile | null;
+  coupons: Coupon[];
+  teamOrders: Order[];   // Firestore-driven via subscribeToOrders
+  hydrated: boolean;
+};
 
 const emptyCart: CartState = { individualItems: [], teamItems: [] };
 
 const initialState: State = {
+  uid: null,
+  pendingPhone: '',
   profile: null,
+  coupons: [],
+  teamOrders: [],
   team: null,
   cart: emptyCart,
   recentlyViewed: [],
   lastOrder: null,
-  coupons: [],
-  teamOrders: [],
   savedProducts: [],
   hydrated: false,
 };
 
+// ─── Reducer ─────────────────────────────────────────────────────────────────
+
 type Action =
-  | { type: 'HYDRATE'; payload: PersistedState }
-  | { type: 'SET'; payload: Partial<PersistedState> }
-  | { type: 'RESET' };
+  | { type: 'HYDRATE_LOCAL'; payload: LocalState }
+  | { type: 'SET_AUTH'; uid: string | null }
+  | { type: 'SET_PROFILE'; profile: UserProfile | null; coupons: Coupon[] }
+  | { type: 'SET_HYDRATED' }
+  | { type: 'SET_PENDING_PHONE'; phone: string }
+  | { type: 'SET'; payload: Partial<State> }
+  | { type: 'RESET_LOCAL' };
 
 function reducer(state: State, action: Action): State {
   switch (action.type) {
-    case 'HYDRATE':
+    case 'HYDRATE_LOCAL':
       return { ...state, ...action.payload, hydrated: true };
+    case 'SET_AUTH':
+      if (action.uid === null) {
+        return { ...initialState, hydrated: true };
+      }
+      return { ...state, uid: action.uid };
+    case 'SET_PROFILE':
+      return { ...state, profile: action.profile, coupons: action.coupons };
+    case 'SET_HYDRATED':
+      return state.hydrated ? state : { ...state, hydrated: true };
+    case 'SET_PENDING_PHONE':
+      return { ...state, pendingPhone: action.phone };
     case 'SET':
       return { ...state, ...action.payload };
-    case 'RESET':
-      return { ...initialState, hydrated: true };
+    case 'RESET_LOCAL':
+      return { ...state, team: null, cart: emptyCart, recentlyViewed: [], lastOrder: null, teamOrders: [], savedProducts: [], uid: null, pendingPhone: '', profile: null, coupons: [] };
     default:
       return state;
   }
 }
+
+// ─── Context ──────────────────────────────────────────────────────────────────
 
 type JoinResult = { ok: true } | { ok: false; error: string };
 
@@ -66,19 +92,19 @@ type AppContextValue = {
   state: State;
   // auth
   login: (phone: string) => void;
-  verify: (uid?: string) => void;
+  verify: (uid: string) => void;
   setInterests: (ids: string[]) => void;
   updateProfile: (patch: Partial<UserProfile>) => void;
   logout: () => void;
   resetAll: () => void;
   // team
   createTeam: () => void;
-  joinTeam: (code: string) => JoinResult;
+  joinTeam: (code: string) => Promise<JoinResult>;
   leaveTeam: () => void;
   addDemoMember: () => void;
   // coupons & team orders
   awardCoupon: (type: CouponType) => void;
-  placeTeamOrder: () => Order | null;
+  placeTeamOrder: (total: number, items: { productId: string; quantity: number; unitPrice: number }[]) => Order | null;
   // cart
   addToCart: (kind: CartKind, productId: string, qty?: number) => void;
   removeFromCart: (kind: CartKind, productId: string) => void;
@@ -97,180 +123,236 @@ const AppContext = createContext<AppContextValue | null>(null);
 export function AppProvider({ children }: { children: React.ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState);
 
-  // Hydrate once on mount.
+  // ── 1. Hydrate local slice from AsyncStorage on mount ─────────────────────
   useEffect(() => {
     let active = true;
     (async () => {
       try {
-        const raw = await AsyncStorage.getItem(STORAGE_KEY);
-        const parsed: Partial<PersistedState> = raw ? JSON.parse(raw) : {};
+        const raw = await AsyncStorage.getItem(LOCAL_STORAGE_KEY);
+        const parsed: Partial<LocalState> = raw ? JSON.parse(raw) : {};
         if (!active) return;
         dispatch({
-          type: 'HYDRATE',
+          type: 'HYDRATE_LOCAL',
           payload: {
-            profile: parsed.profile ?? null,
             team: parsed.team ?? null,
             cart: parsed.cart ?? emptyCart,
             recentlyViewed: Array.isArray(parsed.recentlyViewed) ? parsed.recentlyViewed : [],
             lastOrder: parsed.lastOrder ?? null,
-            coupons: Array.isArray(parsed.coupons) ? parsed.coupons : [],
-            teamOrders: Array.isArray(parsed.teamOrders) ? parsed.teamOrders : [],
             savedProducts: Array.isArray(parsed.savedProducts) ? parsed.savedProducts : [],
           },
         });
       } catch {
-        // Corrupt/malformed persisted data — start clean rather than crash.
-        if (active) dispatch({ type: 'HYDRATE', payload: { profile: null, team: null, cart: emptyCart, recentlyViewed: [], lastOrder: null, coupons: [], teamOrders: [], savedProducts: [] } });
+        if (active) dispatch({ type: 'SET_HYDRATED' });
       }
     })();
+    return () => { active = false; };
+  }, []);
+
+  // ── 2. Firebase Auth listener + user-doc subscription ────────────────────
+  useEffect(() => {
+    if (!auth) {
+      dispatch({ type: 'SET_HYDRATED' });
+      return;
+    }
+
+    let userDocUnsub: (() => void) | null = null;
+    let ordersUnsub: (() => void) | null = null;
+    let profileLoaded = false;
+
+    const authUnsub = onAuthStateChanged(auth, (firebaseUser) => {
+      userDocUnsub?.();
+      userDocUnsub = null;
+      ordersUnsub?.();
+      ordersUnsub = null;
+      profileLoaded = false;
+
+      if (firebaseUser) {
+        dispatch({ type: 'SET_AUTH', uid: firebaseUser.uid });
+
+        userDocUnsub = subscribeToUser(firebaseUser.uid, (profile, coupons) => {
+          dispatch({ type: 'SET_PROFILE', profile, coupons });
+          if (!profileLoaded) {
+            profileLoaded = true;
+            dispatch({ type: 'SET_HYDRATED' });
+          }
+        });
+
+        ordersUnsub = ordersRepo.subscribeToOrders(firebaseUser.uid, (orders) => {
+          const teamOrders = orders.filter((o) => o.kind === 'team');
+          dispatch({ type: 'SET', payload: { teamOrders } });
+        });
+      } else {
+        dispatch({ type: 'SET_AUTH', uid: null });
+      }
+    });
+
     return () => {
-      active = false;
+      authUnsub();
+      userDocUnsub?.();
+      ordersUnsub?.();
     };
   }, []);
 
-  // Persist relevant slices whenever they change (after hydration).
+  // ── 3. Team subscription — triggered by currentTeamId on user profile ────
+  useEffect(() => {
+    const teamId = state.profile?.currentTeamId;
+    if (!teamId) {
+      dispatch({ type: 'SET', payload: { team: null } });
+      return;
+    }
+
+    let teamBase: Omit<ShoppingTeam, 'members'> | null = null;
+    let teamMembers: TeamMember[] = [];
+
+    const merge = () => {
+      if (teamBase) {
+        dispatch({ type: 'SET', payload: { team: { ...teamBase, members: teamMembers } } });
+      }
+    };
+
+    const teamUnsub = teamsRepo.subscribeToTeam(teamId, (t) => {
+      if (!t) { dispatch({ type: 'SET', payload: { team: null } }); return; }
+      teamBase = t;
+      merge();
+    });
+
+    const membersUnsub = teamsRepo.subscribeToMembers(teamId, state.uid, (members) => {
+      teamMembers = members;
+      merge();
+    });
+
+    return () => { teamUnsub(); membersUnsub(); };
+  }, [state.profile?.currentTeamId, state.uid]);
+
+  // ── 4. Auto-confirm team orders when member threshold is reached ─────────
+  useEffect(() => {
+    const memberCount = state.team?.members.length ?? 0;
+    if (memberCount === 0 || state.teamOrders.length === 0) return;
+    const updated = state.teamOrders.map((o) =>
+      o.status === 'pending_participants' && memberCount >= (o.membersNeeded ?? TEAM_MAX_MEMBERS)
+        ? { ...o, status: 'confirmed' as const }
+        : o,
+    );
+    const changed = updated.some((o, i) => o.status !== state.teamOrders[i].status);
+    if (changed) dispatch({ type: 'SET', payload: { teamOrders: updated } });
+  }, [state.team?.members.length, state.teamOrders]);
+
+  // ── 5. Persist local slice whenever it changes ────────────────────────────
   useEffect(() => {
     if (!state.hydrated) return;
-    const toPersist: PersistedState = {
-      profile: state.profile,
+    const local: LocalState = {
       team: state.team,
       cart: state.cart,
       recentlyViewed: state.recentlyViewed,
       lastOrder: state.lastOrder,
-      coupons: state.coupons,
-      teamOrders: state.teamOrders,
       savedProducts: state.savedProducts,
     };
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(toPersist)).catch(() => {});
-  }, [state]);
+    AsyncStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(local)).catch(() => {});
+  }, [state.team, state.cart, state.recentlyViewed, state.lastOrder, state.savedProducts, state.hydrated]);
 
   const value = useMemo<AppContextValue>(() => {
     const setCart = (cart: CartState) => dispatch({ type: 'SET', payload: { cart } });
 
-    const awardCouponInternal = (type: CouponType): Coupon[] => {
-      if (state.coupons.some((c) => c.type === type)) return state.coupons;
-      const tpl = COUPON_CATALOG[type];
-      const coupon: Coupon = { ...tpl, id: uid('coup'), earnedAt: new Date().toISOString() };
-      const next = [...state.coupons, coupon];
-      dispatch({ type: 'SET', payload: { coupons: next } });
-      return next;
-    };
+    const earnedTypes = () => new Set(state.coupons.map((c) => c.type));
 
-    const recomputeTeamOrderStatuses = (memberCount: number) => {
-      if (state.teamOrders.length === 0) return;
-      const updated = state.teamOrders.map((o) =>
-        o.status === 'pending_participants' && memberCount >= (o.membersNeeded ?? TEAM_MAX_MEMBERS)
-          ? { ...o, status: 'confirmed' as const }
-          : o,
-      );
-      dispatch({ type: 'SET', payload: { teamOrders: updated } });
+    const doAwardCoupon = (type: CouponType) => {
+      if (!state.uid) return;
+      awardCoupon(state.uid, type, earnedTypes()).catch(() => {});
     };
 
     return {
       state,
 
       login: (phone) => {
-        const profile: UserProfile = {
-          id: uid('user'),
-          phone,
-          name: 'Вы',
-          city: 'Алматы',
-          budget: 300000,
-          interests: [],
-          isVerified: false,
-          deviceId: '',
-        };
-        dispatch({ type: 'SET', payload: { profile } });
+        dispatch({ type: 'SET_PENDING_PHONE', phone });
       },
 
-      verify: (uid) => {
-        if (!state.profile) return;
-        dispatch({
-          type: 'SET',
-          payload: { profile: { ...state.profile, isVerified: true, deviceId: uid || state.profile.deviceId || randomDeviceId() } },
-        });
+      verify: (firebaseUid) => {
+        createOrInitUser(firebaseUid, state.pendingPhone).catch(() => {});
       },
 
       setInterests: (ids) => {
-        if (!state.profile) return;
-        dispatch({ type: 'SET', payload: { profile: { ...state.profile, interests: ids } } });
+        if (!state.uid) return;
+        updateUser(state.uid, { interests: ids }).catch(() => {});
       },
 
       updateProfile: (patch) => {
-        if (!state.profile) return;
-        dispatch({ type: 'SET', payload: { profile: { ...state.profile, ...patch } } });
+        if (!state.uid) return;
+        updateUser(state.uid, patch).catch(() => {});
       },
 
       logout: () => {
-        // Keep nothing sensitive; return to login but wipe session state.
-        dispatch({ type: 'RESET' });
+        if (auth) signOut(auth).catch(() => {});
+        dispatch({ type: 'RESET_LOCAL' });
       },
 
-      resetAll: () => dispatch({ type: 'RESET' }),
+      resetAll: () => {
+        if (auth) signOut(auth).catch(() => {});
+        dispatch({ type: 'RESET_LOCAL' });
+      },
 
       createTeam: () => {
-        const team: ShoppingTeam = {
-          id: uid('team'),
-          name: 'Моя команда',
-          code: randomTeamCode(),
-          createdAt: new Date().toISOString(),
-          members: [makeMember('Вы', true)],
-        };
-        dispatch({ type: 'SET', payload: { team } });
-        awardCouponInternal('newcomer');
+        if (!state.uid) return;
+        teamsRepo.createTeam(state.uid, 'Моя команда').then(({ teamId }) => {
+          updateUser(state.uid!, { currentTeamId: teamId }).catch(() => {});
+          doAwardCoupon('newcomer');
+        }).catch(() => {});
       },
 
-      joinTeam: (code) => {
-        const team = joinDemoTeam(code);
-        if (!team) {
-          return { ok: false, error: 'Команда с таким кодом не найдена. Проверьте код и попробуйте снова.' };
+      joinTeam: async (code) => {
+        if (!state.uid) return { ok: false as const, error: 'Не авторизован.' };
+        const memberName = state.profile?.name ?? 'Вы';
+        const result = await teamsRepo.joinTeamByCode(state.uid, code, memberName);
+        if (!result.ok) return result;
+        await updateUser(state.uid, { currentTeamId: result.teamId }).catch(() => {});
+        doAwardCoupon('newcomer');
+        return { ok: true as const };
+      },
+
+      leaveTeam: () => {
+        const teamId = state.team?.id ?? state.profile?.currentTeamId;
+        if (state.uid && teamId) {
+          teamsRepo.leaveTeam(state.uid, teamId).catch(() => {});
+          updateUser(state.uid, { currentTeamId: undefined }).catch(() => {});
         }
-        dispatch({ type: 'SET', payload: { team } });
-        awardCouponInternal('newcomer');
-        if (team.members.length >= 3) awardCouponInternal('team_player');
-        return { ok: true };
+        dispatch({ type: 'SET', payload: { cart: { ...state.cart, teamItems: [] }, teamOrders: [] } });
       },
-
-      leaveTeam: () => dispatch({
-        type: 'SET',
-        payload: { team: null, cart: { ...state.cart, teamItems: [] }, teamOrders: [] },
-      }),
 
       addDemoMember: () => {
-        if (!state.team) return;
-        const used = state.team.members.map((m) => m.name);
-        const next = DEMO_MEMBER_NAMES.find((n) => !used.includes(n)) ?? `Гость ${state.team.members.length}`;
-        const team: ShoppingTeam = { ...state.team, members: [...state.team.members, makeMember(next)] };
-        dispatch({ type: 'SET', payload: { team } });
-        const newCount = team.members.length;
-        if (newCount >= 3) awardCouponInternal('team_player');
-        recomputeTeamOrderStatuses(newCount);
+        const teamId = state.team?.id;
+        if (!teamId) return;
+        const used = state.team?.members.map((m) => m.name) ?? [];
+        const next = DEMO_MEMBER_NAMES.find((n) => !used.includes(n)) ?? `Гость ${state.team?.members.length ?? 0}`;
+        teamsRepo.addSyntheticMember(teamId, next).catch(() => {});
+        // coupon and order status re-check will happen when members snapshot fires
       },
 
-      awardCoupon: (type) => { awardCouponInternal(type); },
+      awardCoupon: (type) => { doAwardCoupon(type); },
 
-      placeTeamOrder: () => {
+      placeTeamOrder: (total, items) => {
         if (!state.team || state.cart.teamItems.length === 0) return null;
-        const lines = state.cart.teamItems
-          .map((i) => ({ ...i, /* keep stub */ }));
         const memberCount = state.team.members.length;
         const status: Order['status'] = memberCount >= TEAM_MAX_MEMBERS ? 'confirmed' : 'pending_participants';
+        const oid = orderNumber();
         const order: Order = {
-          id: orderNumber(),
+          id: oid,
           kind: 'team',
           status,
-          total: 0,
+          total,
           city: state.profile?.city ?? '',
           address: '',
           deliveryMethod: 'pickup',
           paymentMethod: 'card',
-          itemCount: lines.reduce((s, l) => s + l.quantity, 0),
+          itemCount: items.reduce((s, i) => s + i.quantity, 0),
           createdAt: new Date().toISOString(),
           teamId: state.team.id,
           membersNeeded: TEAM_MAX_MEMBERS,
           membersAtOrder: memberCount,
         };
-        dispatch({ type: 'SET', payload: { teamOrders: [...state.teamOrders, order] } });
+        if (state.uid) {
+          ordersRepo.createOrder(state.uid, oid, { kind: order.kind, status: order.status, total: order.total, city: order.city, address: order.address, deliveryMethod: order.deliveryMethod, paymentMethod: order.paymentMethod, itemCount: order.itemCount, teamId: order.teamId, membersNeeded: order.membersNeeded, membersAtOrder: order.membersAtOrder }).catch(() => {});
+        }
+        dispatch({ type: 'SET', payload: { cart: { ...state.cart, teamItems: [] } } });
         return order;
       },
 
@@ -282,7 +364,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           ? items.map((i) => (i.productId === productId ? { ...i, quantity: i.quantity + qty } : i))
           : [...items, { productId, quantity: qty }];
         setCart({ ...state.cart, [key]: nextItems });
-        if (kind === 'team' && items.length === 0) awardCouponInternal('first_purchase');
+        if (kind === 'team' && items.length === 0) doAwardCoupon('first_purchase');
       },
 
       removeFromCart: (kind, productId) => {
@@ -322,12 +404,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       },
 
       placeOrder: (draft) => {
-        const order: Order = { ...draft, id: orderNumber(), status: draft.status ?? 'confirmed', createdAt: new Date().toISOString() };
+        const oid = orderNumber();
+        const order: Order = { ...draft, id: oid, status: draft.status ?? 'confirmed', createdAt: new Date().toISOString() };
+        if (state.uid) {
+          const { id: _id, createdAt: _ca, ...rest } = order;
+          ordersRepo.createOrder(state.uid, oid, rest).catch(() => {});
+        }
         const key = draft.kind === 'team' ? 'teamItems' : 'individualItems';
-        dispatch({
-          type: 'SET',
-          payload: { lastOrder: order, cart: { ...state.cart, [key]: [] } },
-        });
+        dispatch({ type: 'SET', payload: { lastOrder: order, cart: { ...state.cart, [key]: [] } } });
         return order;
       },
     };

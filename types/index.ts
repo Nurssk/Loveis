@@ -24,6 +24,7 @@ export type UserProfile = {
   interests: string[];
   isVerified: boolean;
   deviceId: string;
+  currentTeamId?: string;
 };
 
 export type TeamMember = {

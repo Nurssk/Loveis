@@ -4,8 +4,8 @@
  * Адаптация серверной логики под клиентский MVP:
  * - initPayment(input) → создаёт invoice_id, дёргает Halyk createInvoice, возвращает invoice_url.
  *   Дальше UI открывает URL в браузере через Linking.openURL.
- * - applyHalykStatus(...) и handlePostLink(...) формально портированы для полноты,
- *   но на проде они должны жить на бэкенде (вебхук Halyk не достучится до телефона).
+ * - applyHalykStatus(...) формально портирован для полноты,
+ *   но на проде должен жить на бэкенде (вебхук Halyk не достучится до телефона).
  */
 
 import { halykConfig, halykConfigured, halykUrls, paymentLinks } from '@/config/payment';

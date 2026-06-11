@@ -10,10 +10,10 @@ import { SectionHeader } from '@/components/SectionHeader';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { useToast } from '@/components/Toast';
 import { categoryLabel } from '@/data/categories';
-import { getProduct } from '@/data/products';
 import { ProductImage } from '@/components/ProductImage';
 import { colors, radii, shadows, spacing, typography } from '@/constants/theme';
 import { useApp } from '@/store/AppContext';
+import { useProductsCtx } from '@/store/ProductsContext';
 import { formatPhoneInput, formatPrice } from '@/utils/format';
 
 /** Cross-platform confirm (web has no Alert dialog). */
@@ -28,13 +28,11 @@ function confirm(title: string, message: string, onYes: () => void) {
   ]);
 }
 
-const DEMO_INDIVIDUAL = ['p1', 'p7'];
-const DEMO_TEAM = ['p2', 'p5', 'p13'];
-
 export default function ProfileScreen() {
   const router = useRouter();
   const toast = useToast();
   const { state, logout, resetAll, setInterests, createTeam, addToCart, clearCart, unsaveProduct } = useApp();
+  const { getProduct, products } = useProductsCtx();
   const [showDemo, setShowDemo] = useState(false);
 
   const profile = state.profile;
@@ -42,12 +40,12 @@ export default function ProfileScreen() {
 
   const fillTeamCart = () => {
     if (!state.team) createTeam();
-    DEMO_TEAM.forEach((id) => addToCart('team', id));
+    products.slice(2, 5).forEach((p) => addToCart('team', p.id));
     toast.show('Командная корзина заполнена');
   };
 
   const fillIndividualCart = () => {
-    DEMO_INDIVIDUAL.forEach((id) => addToCart('individual', id));
+    products.slice(0, 2).forEach((p) => addToCart('individual', p.id));
     toast.show('Индивидуальная корзина заполнена');
   };
 
@@ -105,6 +103,7 @@ export default function ProfileScreen() {
           >
             {state.savedProducts.map((id) => {
               const product = getProduct(id);
+              // product may still be loading; skip until catalog is ready
               if (!product) return null;
               return (
                 <View key={id} style={styles.savedCard}>

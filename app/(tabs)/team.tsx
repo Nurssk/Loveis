@@ -12,9 +12,9 @@ import { ErrorMessage } from '@/components/ErrorMessage';
 import { SectionHeader } from '@/components/SectionHeader';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { useToast } from '@/components/Toast';
-import { VALID_DEMO_CODES } from '@/data/teams';
 import { colors, radii, shadows, spacing, typography } from '@/constants/theme';
 import { useApp } from '@/store/AppContext';
+import { useProductsCtx } from '@/store/ProductsContext';
 import { resolveLines } from '@/utils/cart';
 import { DISCOUNT_PER_MEMBER, MAX_DISCOUNT, nextDiscountThreshold, teamDiscountPercent } from '@/utils/discount';
 import { formatPrice, memberWord } from '@/utils/format';
@@ -78,6 +78,7 @@ export default function TeamScreen() {
 
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [joining, setJoining] = useState(false);
 
   const team = state.team;
   const memberCount = team?.members.length ?? 0;
@@ -86,7 +87,8 @@ export default function TeamScreen() {
 
   const countdown = useCountdown(team?.createdAt ?? new Date().toISOString());
 
-  const cartLines = useMemo(() => resolveLines(state.cart.teamItems), [state.cart.teamItems]);
+  const { getProduct } = useProductsCtx();
+  const cartLines = useMemo(() => resolveLines(state.cart.teamItems, getProduct), [state.cart.teamItems, getProduct]);
   const cartSubtotal = cartLines.reduce((s, l) => s + l.product.regularPrice * l.quantity, 0);
   const cartDiscount = Math.round((cartSubtotal * discount) / 100);
   const cartTotal = cartSubtotal - cartDiscount;
@@ -111,25 +113,36 @@ export default function TeamScreen() {
   }, [countdown, team]);
 
   const onPlaceTeamOrder = () => {
-    const order = placeTeamOrder();
+    const orderItems = cartLines.map((line) => ({
+      productId: line.product.id,
+      quantity: line.quantity,
+      unitPrice: Math.round(line.product.regularPrice * (1 - discount / 100)),
+    }));
+    const order = placeTeamOrder(cartTotal, orderItems);
     if (!order) return;
     if (order.status === 'pending_participants') {
       toast.show(`Заказ #${order.id} создан — ждём ещё ${(order.membersNeeded ?? 6) - (order.membersAtOrder ?? 0)} участников`, 'info');
     } else {
-      toast.show('Заказ подтверждён 🎉');
+      toast.show('Заказ подтверждён!');
     }
     router.push('/(tabs)/cart');
   };
 
-  const onJoin = () => {
-    const result = joinTeam(code);
-    if (!result.ok) {
-      setError(result.error);
-      return;
+  const onJoin = async () => {
+    if (joining) return;
+    setJoining(true);
+    try {
+      const result = await joinTeam(code);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setError(null);
+      setCode('');
+      toast.show('Вы присоединились к команде');
+    } finally {
+      setJoining(false);
     }
-    setError(null);
-    setCode('');
-    toast.show('Вы присоединились к команде');
   };
 
   const onCopy = async () => {
@@ -186,12 +199,11 @@ export default function TeamScreen() {
             }}
           />
           <AppButton
-            title="Присоединиться"
+            title={joining ? 'Ищем команду…' : 'Присоединиться'}
             variant="secondary"
             onPress={onJoin}
-            disabled={code.trim().length === 0}
+            disabled={code.trim().length === 0 || joining}
           />
-          <Text style={styles.demoCodes}>Демо-коды: {VALID_DEMO_CODES.join(', ')}</Text>
         </View>
       </ScreenContainer>
     );

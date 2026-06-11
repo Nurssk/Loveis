@@ -10,6 +10,7 @@ import { ScreenContainer } from '@/components/ScreenContainer';
 import { categoryLabel } from '@/data/categories';
 import { colors, radii, shadows, spacing, typography } from '@/constants/theme';
 import { useApp } from '@/store/AppContext';
+import { useProductsCtx } from '@/store/ProductsContext';
 import { CartKind } from '@/types';
 import { CartLine, summarize } from '@/utils/cart';
 import { teamDiscountPercent } from '@/utils/discount';
@@ -20,9 +21,10 @@ export default function CartScreen() {
   const { state, setQuantity, removeFromCart } = useApp();
   const [tab, setTab] = useState<CartKind>('individual');
 
+  const { getProduct } = useProductsCtx();
   const memberCount = state.team?.members.length ?? 0;
-  const individual = useMemo(() => summarize(state.cart.individualItems, 0), [state.cart.individualItems]);
-  const team = useMemo(() => summarize(state.cart.teamItems, memberCount), [state.cart.teamItems, memberCount]);
+  const individual = useMemo(() => summarize(state.cart.individualItems, getProduct, 0), [state.cart.individualItems, getProduct]);
+  const team = useMemo(() => summarize(state.cart.teamItems, getProduct, memberCount), [state.cart.teamItems, getProduct, memberCount]);
 
   const active = tab === 'individual' ? individual : team;
 

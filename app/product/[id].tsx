@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
@@ -12,9 +12,9 @@ import { Rating } from '@/components/Rating';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { useToast } from '@/components/Toast';
 import { categoryLabel } from '@/data/categories';
-import { getProduct } from '@/data/products';
 import { colors, LAYOUT, radii, shadows, spacing, typography } from '@/constants/theme';
 import { useApp } from '@/store/AppContext';
+import { useProductsCtx } from '@/store/ProductsContext';
 import { applyDiscount, teamDiscountPercent } from '@/utils/discount';
 import { formatPrice, memberWord } from '@/utils/format';
 
@@ -25,6 +25,7 @@ export default function ProductDetailScreen() {
   const router = useRouter();
   const toast = useToast();
   const { state, addToCart, markViewed, saveProduct, unsaveProduct } = useApp();
+  const { getProduct, loading } = useProductsCtx();
   const [modalVisible, setModalVisible] = useState(false);
 
   const product = id ? getProduct(id) : undefined;
@@ -33,6 +34,17 @@ export default function ProductDetailScreen() {
     if (product) markViewed(product.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product?.id]);
+
+  if (loading && !product) {
+    return (
+      <ScreenContainer>
+        <Pressable onPress={() => router.back()} style={styles.backStandalone} accessibilityLabel="Назад" accessibilityRole="button">
+          <Ionicons name="chevron-back" size={26} color={colors.text} />
+        </Pressable>
+        <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 48 }} />
+      </ScreenContainer>
+    );
+  }
 
   if (!product) {
     return (

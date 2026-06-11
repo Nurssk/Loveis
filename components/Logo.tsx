@@ -1,32 +1,29 @@
-import { Ionicons } from '@expo/vector-icons';
 import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Image, StyleSheet, Text, View } from 'react-native';
 
-import { colors, radii, spacing, typography } from '@/constants/theme';
+import { colors, spacing, typography } from '@/constants/theme';
 
-export function Logo({ size = 'lg' }: { size?: 'sm' | 'lg' }) {
-  const big = size === 'lg';
-  const mark = big ? 56 : 36;
+const MARK = require('@/assets/birge-logo.png');
+
+type Props = { size?: 'sm' | 'lg'; showWord?: boolean };
+
+/** Brand lockup: the BirGe squircle mark + optional wordmark. */
+export function Logo({ size = 'lg', showWord = true }: Props) {
+  const mark = size === 'lg' ? 52 : 34;
   return (
     <View style={styles.row}>
-      <View style={[styles.mark, { width: mark, height: mark, borderRadius: mark / 3 }]}>
-        <Ionicons name="people" size={mark * 0.55} color={colors.textInverse} />
-      </View>
-      <Text style={[styles.word, big ? typography.h1 : typography.h3]}>
-        Bir<Text style={styles.accent}>Ge</Text>
-      </Text>
+      <Image source={MARK} style={{ width: mark, height: mark }} resizeMode="contain" />
+      {showWord ? (
+        <Text style={[styles.word, size === 'lg' ? typography.h1 : typography.h3]}>
+          Bir<Text style={styles.accent}>Ge</Text>
+        </Text>
+      ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  mark: {
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: radii.md,
-  },
   word: { color: colors.text },
   accent: { color: colors.primary },
 });

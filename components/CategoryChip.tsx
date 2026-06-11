@@ -27,7 +27,7 @@ export function CategoryChip({ label, icon, selected, onPress }: Props) {
         <Ionicons
           name={icon}
           size={15}
-          color={selected ? colors.textInverse : colors.textSecondary}
+          color={selected ? colors.primaryDark : colors.textSecondary}
           style={styles.icon}
         />
       ) : null}
@@ -47,9 +47,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
-  chipSelected: { backgroundColor: colors.primary, borderColor: colors.primary },
+  chipSelected: { backgroundColor: colors.primarySoft, borderColor: colors.primarySoft },
   pressed: { opacity: 0.8 },
   icon: { marginRight: spacing.xs },
   label: { ...typography.caption, color: colors.textSecondary, fontWeight: '700' },
-  labelSelected: { color: colors.textInverse },
+  labelSelected: { color: colors.primaryDark },
 });
