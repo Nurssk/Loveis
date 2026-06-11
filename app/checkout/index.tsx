@@ -1,28 +1,33 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import React, { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AppButton } from '@/components/AppButton';
 import { AppInput } from '@/components/AppInput';
 import { LoadingOverlay } from '@/components/LoadingOverlay';
 import { ProductImage } from '@/components/ProductImage';
 import { ScreenContainer } from '@/components/ScreenContainer';
+import { useToast } from '@/components/Toast';
 import { colors, radii, shadows, spacing, typography } from '@/constants/theme';
+import { halykConfigured, paymentLinks } from '@/config/payment';
+import { paymentService, PaymentError } from '@/services/paymentService';
 import { useApp } from '@/store/AppContext';
 import { CartKind } from '@/types';
 import { summarize } from '@/utils/cart';
 import { formatPrice, itemWord } from '@/utils/format';
 
+type PaymentStage = 'creating' | 'redirecting' | 'verifying';
+const STAGE_LABEL: Record<PaymentStage, string> = {
+  creating: 'Создание платежа…',
+  redirecting: 'Переход в Halyk ePay…',
+  verifying: 'Проверка статуса платежа…',
+};
+
 const DELIVERY_METHODS = [
   { id: 'courier', label: 'Курьер', detail: '2–4 дня · 0 ₸', icon: 'bicycle-outline' },
   { id: 'pickup', label: 'Пункт выдачи', detail: 'Завтра · 0 ₸', icon: 'storefront-outline' },
-] as const;
-
-const PAYMENT_METHODS = [
-  { id: 'kaspi', label: 'Kaspi', icon: 'card-outline' },
-  { id: 'halyk', label: 'Halyk', icon: 'card-outline' },
-  { id: 'card', label: 'Банковская карта', icon: 'card-outline' },
 ] as const;
 
 export default function CheckoutScreen() {
@@ -37,32 +42,113 @@ export default function CheckoutScreen() {
 
   const [address, setAddress] = useState('');
   const [delivery, setDelivery] = useState<string>(DELIVERY_METHODS[0].id);
-  const [payment, setPayment] = useState<string | null>(null);
   const [touched, setTouched] = useState(false);
-  const [processing, setProcessing] = useState(false);
+  const [stage, setStage] = useState<PaymentStage | null>(null);
+  const toast = useToast();
+  const processing = stage !== null;
 
   const addressOk = address.trim().length >= 5;
-  const paymentOk = !!payment;
-  const canPay = addressOk && paymentOk && summary.itemCount > 0;
+  const canPay = addressOk && summary.itemCount > 0;
 
-  const onPay = () => {
+  const placeLocalOrder = () =>
+    placeOrder({
+      kind,
+      total: summary.finalTotal,
+      city: state.profile?.city ?? 'Алматы',
+      address: address.trim(),
+      deliveryMethod: DELIVERY_METHODS.find((d) => d.id === delivery)?.label ?? '',
+      paymentMethod: 'Halyk ePay',
+      itemCount: summary.itemCount,
+    });
+
+  const onPay = async () => {
     setTouched(true);
-    if (!canPay) return;
-    setProcessing(true);
-    // Simulated payment processing delay.
-    setTimeout(() => {
-      const order = placeOrder({
-        kind,
-        total: summary.finalTotal,
-        city: state.profile?.city ?? 'Алматы',
-        address: address.trim(),
-        deliveryMethod: DELIVERY_METHODS.find((d) => d.id === delivery)?.label ?? '',
-        paymentMethod: PAYMENT_METHODS.find((p) => p.id === payment)?.label ?? '',
-        itemCount: summary.itemCount,
+    if (!canPay) {
+      console.log('[pay] click ignored — form invalid', { addressOk, items: summary.itemCount });
+      return;
+    }
+
+    console.log('[pay] click', { configured: halykConfigured(), kind, total: summary.finalTotal });
+
+    // Демо-fallback: creds не заданы → симулируем, но громко предупреждаем.
+    if (!halykConfigured()) {
+      toast.show('Demo-режим: Halyk creds не заданы', 'info');
+      setStage('creating');
+      setTimeout(() => {
+        const order = placeLocalOrder();
+        setStage(null);
+        router.replace(`/checkout/success?orderId=${order.id}`);
+      }, 1200);
+      return;
+    }
+
+    try {
+      // ── Шаг 1: создаём invoice на стороне Halyk
+      setStage('creating');
+      const profile = state.profile;
+      console.log('[pay] step 1: initPayment…');
+      // Намеренно НЕ передаём phone/email — у демо-юзера фейковый номер,
+      // Halyk пытается отправить SMS и падает с 1079.
+      const init = await paymentService.initPayment({
+        orderRef: `${kind}-${Date.now()}`,
+        userId: profile?.id ?? 'guest',
+        title: summary.lines[0]?.product.title ?? 'Заказ',
+        amount: summary.finalTotal,
       });
-      setProcessing(false);
-      router.replace(`/checkout/success?orderId=${order.id}`);
-    }, 1400);
+      console.log('[pay] invoice created', init);
+
+      // ── Шаг 2: открываем платёжную страницу Halyk.
+      // На web — обычный window.open в новой вкладке (openAuthSessionAsync
+      // на web дёргает history.back и ломает router-стек).
+      // На native — WebBrowser auth session.
+      setStage('redirecting');
+      console.log('[pay] step 2: opening browser', { url: init.invoiceUrl });
+      if (Platform.OS === 'web') {
+        if (typeof window !== 'undefined') {
+          window.open(init.invoiceUrl, '_blank', 'noopener,noreferrer');
+        }
+      } else {
+        WebBrowser.openAuthSessionAsync(init.invoiceUrl, 'https://example.com/checkout/')
+          .then((b) => console.log('[pay] browser closed', b))
+          .catch(() => {});
+      }
+
+      // ── Шаг 3: спрашиваем юзера, прошла ли оплата.
+      // Polling status сейчас не работает: test-creds Halyk рассогласованы
+      // (terminal не принадлежит clientId → resultCode 109). Когда саппорт
+      // выдаст правильный shop↔terminal pair, можно вернуть paymentService.pollStatus().
+      setStage(null);
+      const confirmed = await new Promise<boolean>((resolve) => {
+        Alert.alert(
+          'Оплата в Halyk ePay',
+          'Завершите оплату в открывшейся вкладке. После этого вернитесь сюда.',
+          [
+            { text: 'Отмена', style: 'cancel', onPress: () => resolve(false) },
+            { text: 'Я оплатил', onPress: () => resolve(true) },
+          ],
+          { cancelable: false },
+        );
+      });
+
+      if (!confirmed) {
+        toast.show('Оплата отменена', 'info');
+        return;
+      }
+      const order = placeLocalOrder();
+      router.replace(`/checkout/success?orderId=${order.id}&invoice=${init.invoiceId}`);
+      return;
+    } catch (err) {
+      const msg =
+        err instanceof PaymentError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : String(err);
+      console.error('[pay] failed:', msg, err);
+      Alert.alert('Ошибка оплаты', msg);
+    } finally {
+      setStage(null);
+    }
   };
 
   if (summary.itemCount === 0) {
@@ -137,21 +223,6 @@ export default function CheckoutScreen() {
         ))}
       </View>
 
-      {/* Payment */}
-      <Text style={styles.sectionTitle}>Способ оплаты</Text>
-      <View style={styles.options}>
-        {PAYMENT_METHODS.map((p) => (
-          <Option
-            key={p.id}
-            selected={payment === p.id}
-            icon={p.icon}
-            title={p.label}
-            onPress={() => setPayment(p.id)}
-          />
-        ))}
-      </View>
-      {touched && !paymentOk ? <Text style={styles.error}>Выберите способ оплаты</Text> : null}
-
       {/* Summary */}
       <View style={styles.summaryCard}>
         <Row label={`Сумма (${summary.itemCount})`} value={formatPrice(summary.subtotal)} />
@@ -169,9 +240,13 @@ export default function CheckoutScreen() {
         </View>
       </View>
 
-      <Text style={styles.note}>Оплата симулируется — реальные платёжные системы не подключены.</Text>
+      <Text style={styles.note}>
+        {halykConfigured()
+          ? 'Оплата через Halyk ePay. После оплаты вы вернётесь в приложение.'
+          : 'Оплата симулируется — задайте Halyk creds в config/payment.ts для боевого режима.'}
+      </Text>
 
-      <LoadingOverlay visible={processing} label="Обработка оплаты…" />
+      <LoadingOverlay visible={processing} label={stage ? STAGE_LABEL[stage] : ''} />
     </ScreenContainer>
   );
 }
