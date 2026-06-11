@@ -57,51 +57,24 @@ function useCountdown(createdAt: string): string | null {
   return remaining;
 }
 
-// ─── Coupons ──────────────────────────────────────────────────────────────────
+// ─── Coupons (catalog) ────────────────────────────────────────────────────────
+// Заработанные купоны живут в AppContext (state.coupons). Этот каталог нужен
+// только чтобы показывать незаработанные карточки (locked) на странице.
 
-type Coupon = {
-  id: string;
-  title: string;
-  discount: number;
-  description: string;
-  earned: boolean;
-};
+import type { CouponType } from '@/types';
 
-function useCoupons(memberCount: number, hasCartItems: boolean): Coupon[] {
-  return useMemo<Coupon[]>(
-    () => [
-      {
-        id: 'newcomer',
-        title: 'Новичок',
-        discount: 3,
-        description: 'За вступление в команду',
-        earned: true,
-      },
-      {
-        id: 'teamplayer',
-        title: 'Командный игрок',
-        discount: 5,
-        description: 'Команда 3+ участника',
-        earned: memberCount >= 3,
-      },
-      {
-        id: 'first_buy',
-        title: 'Первая покупка',
-        discount: 2,
-        description: 'Первый товар в корзине команды',
-        earned: hasCartItems,
-      },
-    ],
-    [memberCount, hasCartItems],
-  );
-}
+const COUPON_DISPLAY: { type: CouponType; title: string; description: string; discount: number }[] = [
+  { type: 'newcomer',       title: 'Новичок',         description: 'За вступление в команду',          discount: 3 },
+  { type: 'team_player',    title: 'Командный игрок', description: 'Команда 3+ участника',             discount: 5 },
+  { type: 'first_purchase', title: 'Первая покупка',  description: 'Первый товар в командной корзине', discount: 2 },
+];
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export default function TeamScreen() {
   const router = useRouter();
   const toast = useToast();
-  const { state, createTeam, joinTeam, leaveTeam, addDemoMember } = useApp();
+  const { state, createTeam, joinTeam, leaveTeam, addDemoMember, placeTeamOrder } = useApp();
 
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -118,7 +91,35 @@ export default function TeamScreen() {
   const cartDiscount = Math.round((cartSubtotal * discount) / 100);
   const cartTotal = cartSubtotal - cartDiscount;
 
-  const coupons = useCoupons(memberCount, cartLines.length > 0);
+  const earnedTypes = useMemo(
+    () => new Set(state.coupons.map((c) => c.type)),
+    [state.coupons],
+  );
+
+  const pendingTeamOrder = useMemo(
+    () => state.teamOrders.find((o) => o.status === 'pending_participants') ?? null,
+    [state.teamOrders],
+  );
+
+  // Auto-expire team when countdown reaches zero
+  useEffect(() => {
+    if (!team) return;
+    if (countdown === null) {
+      leaveTeam();
+      toast.show('Команда истекла — создайте новую', 'info');
+    }
+  }, [countdown, team]);
+
+  const onPlaceTeamOrder = () => {
+    const order = placeTeamOrder();
+    if (!order) return;
+    if (order.status === 'pending_participants') {
+      toast.show(`Заказ #${order.id} создан — ждём ещё ${(order.membersNeeded ?? 6) - (order.membersAtOrder ?? 0)} участников`, 'info');
+    } else {
+      toast.show('Заказ подтверждён 🎉');
+    }
+    router.push('/(tabs)/cart');
+  };
 
   const onJoin = () => {
     const result = joinTeam(code);
@@ -322,29 +323,32 @@ export default function TeamScreen() {
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.couponsContent}
       >
-        {coupons.map((c) => (
-          <View key={c.id} style={[styles.couponCard, !c.earned && styles.couponCardLocked]}>
-            <Text style={[styles.couponDiscount, !c.earned && styles.couponDiscountLocked]}>
-              -{c.discount}%
-            </Text>
-            <Text style={[styles.couponTitle, !c.earned && styles.couponTitleLocked]}>
-              {c.title}
-            </Text>
-            <Text style={styles.couponDesc} numberOfLines={2}>
-              {c.description}
-            </Text>
-            <View style={c.earned ? styles.couponEarnedBadge : styles.couponLockedBadge}>
-              <Ionicons
-                name={c.earned ? 'checkmark-circle' : 'lock-closed-outline'}
-                size={13}
-                color={c.earned ? colors.success : colors.textMuted}
-              />
-              <Text style={c.earned ? styles.couponEarnedText : styles.couponLockedText}>
-                {c.earned ? 'Получен' : 'Не получен'}
+        {COUPON_DISPLAY.map((c) => {
+          const earned = earnedTypes.has(c.type);
+          return (
+            <View key={c.type} style={[styles.couponCard, !earned && styles.couponCardLocked]}>
+              <Text style={[styles.couponDiscount, !earned && styles.couponDiscountLocked]}>
+                -{c.discount}%
               </Text>
+              <Text style={[styles.couponTitle, !earned && styles.couponTitleLocked]}>
+                {c.title}
+              </Text>
+              <Text style={styles.couponDesc} numberOfLines={2}>
+                {c.description}
+              </Text>
+              <View style={earned ? styles.couponEarnedBadge : styles.couponLockedBadge}>
+                <Ionicons
+                  name={earned ? 'checkmark-circle' : 'lock-closed-outline'}
+                  size={13}
+                  color={earned ? colors.success : colors.textMuted}
+                />
+                <Text style={earned ? styles.couponEarnedText : styles.couponLockedText}>
+                  {earned ? 'Получен' : 'Не получен'}
+                </Text>
+              </View>
             </View>
-          </View>
-        ))}
+          );
+        })}
       </ScrollView>
 
       {/* Members */}
@@ -426,20 +430,39 @@ export default function TeamScreen() {
               <Text style={styles.totalLabel}>Итого</Text>
               <Text style={styles.totalValue}>{formatPrice(cartTotal)}</Text>
             </View>
-            {discount < MAX_DISCOUNT && (
+            {pendingTeamOrder ? (
               <View style={styles.pendingBanner}>
                 <Ionicons name="hourglass-outline" size={14} color={colors.warning} />
                 <Text style={styles.pendingText}>
-                  Ещё {6 - memberCount} {memberWord(6 - memberCount)} → скидка до {MAX_DISCOUNT}%
+                  Заказ #{pendingTeamOrder.id} ждёт ещё{' '}
+                  {(pendingTeamOrder.membersNeeded ?? 6) - memberCount}{' '}
+                  {memberWord((pendingTeamOrder.membersNeeded ?? 6) - memberCount)}
                 </Text>
               </View>
+            ) : discount < MAX_DISCOUNT ? (
+              <View style={styles.pendingBanner}>
+                <Ionicons name="people-outline" size={14} color={colors.warning} />
+                <Text style={styles.pendingText}>
+                  Пригласите ещё {6 - memberCount} {memberWord(6 - memberCount)} → скидка до {MAX_DISCOUNT}%
+                </Text>
+              </View>
+            ) : null}
+            {pendingTeamOrder ? (
+              <AppButton
+                title="К корзине"
+                icon="arrow-forward"
+                variant="ghost"
+                onPress={() => router.push('/(tabs)/cart')}
+                style={styles.cartBtn}
+              />
+            ) : (
+              <AppButton
+                title="Оформить командный заказ"
+                icon="checkmark-circle-outline"
+                onPress={onPlaceTeamOrder}
+                style={styles.cartBtn}
+              />
             )}
-            <AppButton
-              title="Перейти в корзину"
-              icon="arrow-forward"
-              onPress={() => router.push('/(tabs)/cart')}
-              style={styles.cartBtn}
-            />
           </>
         )}
       </View>

@@ -2,8 +2,16 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import React, { createContext, useContext, useEffect, useMemo, useReducer } from 'react';
 
 import { joinDemoTeam, makeMember, DEMO_MEMBER_NAMES } from '@/data/teams';
-import { CartKind, CartState, Order, ShoppingTeam, UserProfile } from '@/types';
+import { CartKind, CartState, Coupon, CouponType, Order, ShoppingTeam, UserProfile } from '@/types';
 import { orderNumber, randomDeviceId, randomTeamCode, uid } from '@/utils/ids';
+
+const TEAM_MAX_MEMBERS = 6;
+
+const COUPON_CATALOG: Record<CouponType, Omit<Coupon, 'id' | 'earnedAt' | 'usedAt'>> = {
+  newcomer:       { type: 'newcomer',       title: 'Новичок',         description: 'За вступление в команду',            discount: 3 },
+  team_player:    { type: 'team_player',    title: 'Командный игрок', description: 'Команда 3+ участника',               discount: 5 },
+  first_purchase: { type: 'first_purchase', title: 'Первая покупка',  description: 'Первый товар в командной корзине',   discount: 2 },
+};
 
 const STORAGE_KEY = 'birge.state.v1';
 
@@ -13,6 +21,9 @@ type PersistedState = {
   cart: CartState;
   recentlyViewed: string[];
   lastOrder: Order | null;
+  coupons: Coupon[];
+  teamOrders: Order[];
+  savedProducts: string[];
 };
 
 type State = PersistedState & { hydrated: boolean };
@@ -25,6 +36,9 @@ const initialState: State = {
   cart: emptyCart,
   recentlyViewed: [],
   lastOrder: null,
+  coupons: [],
+  teamOrders: [],
+  savedProducts: [],
   hydrated: false,
 };
 
@@ -62,11 +76,17 @@ type AppContextValue = {
   joinTeam: (code: string) => JoinResult;
   leaveTeam: () => void;
   addDemoMember: () => void;
+  // coupons & team orders
+  awardCoupon: (type: CouponType) => void;
+  placeTeamOrder: () => Order | null;
   // cart
   addToCart: (kind: CartKind, productId: string, qty?: number) => void;
   removeFromCart: (kind: CartKind, productId: string) => void;
   setQuantity: (kind: CartKind, productId: string, qty: number) => void;
   clearCart: (kind: CartKind) => void;
+  // saved products
+  saveProduct: (id: string) => void;
+  unsaveProduct: (id: string) => void;
   // misc
   markViewed: (productId: string) => void;
   placeOrder: (order: Omit<Order, 'id' | 'createdAt'>) => Order;
@@ -93,11 +113,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             cart: parsed.cart ?? emptyCart,
             recentlyViewed: Array.isArray(parsed.recentlyViewed) ? parsed.recentlyViewed : [],
             lastOrder: parsed.lastOrder ?? null,
+            coupons: Array.isArray(parsed.coupons) ? parsed.coupons : [],
+            teamOrders: Array.isArray(parsed.teamOrders) ? parsed.teamOrders : [],
+            savedProducts: Array.isArray(parsed.savedProducts) ? parsed.savedProducts : [],
           },
         });
       } catch {
         // Corrupt/malformed persisted data — start clean rather than crash.
-        if (active) dispatch({ type: 'HYDRATE', payload: { profile: null, team: null, cart: emptyCart, recentlyViewed: [], lastOrder: null } });
+        if (active) dispatch({ type: 'HYDRATE', payload: { profile: null, team: null, cart: emptyCart, recentlyViewed: [], lastOrder: null, coupons: [], teamOrders: [], savedProducts: [] } });
       }
     })();
     return () => {
@@ -114,12 +137,34 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       cart: state.cart,
       recentlyViewed: state.recentlyViewed,
       lastOrder: state.lastOrder,
+      coupons: state.coupons,
+      teamOrders: state.teamOrders,
+      savedProducts: state.savedProducts,
     };
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(toPersist)).catch(() => {});
   }, [state]);
 
   const value = useMemo<AppContextValue>(() => {
     const setCart = (cart: CartState) => dispatch({ type: 'SET', payload: { cart } });
+
+    const awardCouponInternal = (type: CouponType): Coupon[] => {
+      if (state.coupons.some((c) => c.type === type)) return state.coupons;
+      const tpl = COUPON_CATALOG[type];
+      const coupon: Coupon = { ...tpl, id: uid('coup'), earnedAt: new Date().toISOString() };
+      const next = [...state.coupons, coupon];
+      dispatch({ type: 'SET', payload: { coupons: next } });
+      return next;
+    };
+
+    const recomputeTeamOrderStatuses = (memberCount: number) => {
+      if (state.teamOrders.length === 0) return;
+      const updated = state.teamOrders.map((o) =>
+        o.status === 'pending_participants' && memberCount >= (o.membersNeeded ?? TEAM_MAX_MEMBERS)
+          ? { ...o, status: 'confirmed' as const }
+          : o,
+      );
+      dispatch({ type: 'SET', payload: { teamOrders: updated } });
+    };
 
     return {
       state,
@@ -172,6 +217,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           members: [makeMember('Вы', true)],
         };
         dispatch({ type: 'SET', payload: { team } });
+        awardCouponInternal('newcomer');
       },
 
       joinTeam: (code) => {
@@ -180,10 +226,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           return { ok: false, error: 'Команда с таким кодом не найдена. Проверьте код и попробуйте снова.' };
         }
         dispatch({ type: 'SET', payload: { team } });
+        awardCouponInternal('newcomer');
+        if (team.members.length >= 3) awardCouponInternal('team_player');
         return { ok: true };
       },
 
-      leaveTeam: () => dispatch({ type: 'SET', payload: { team: null, cart: { ...state.cart, teamItems: [] } } }),
+      leaveTeam: () => dispatch({
+        type: 'SET',
+        payload: { team: null, cart: { ...state.cart, teamItems: [] }, teamOrders: [] },
+      }),
 
       addDemoMember: () => {
         if (!state.team) return;
@@ -191,6 +242,36 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const next = DEMO_MEMBER_NAMES.find((n) => !used.includes(n)) ?? `Гость ${state.team.members.length}`;
         const team: ShoppingTeam = { ...state.team, members: [...state.team.members, makeMember(next)] };
         dispatch({ type: 'SET', payload: { team } });
+        const newCount = team.members.length;
+        if (newCount >= 3) awardCouponInternal('team_player');
+        recomputeTeamOrderStatuses(newCount);
+      },
+
+      awardCoupon: (type) => { awardCouponInternal(type); },
+
+      placeTeamOrder: () => {
+        if (!state.team || state.cart.teamItems.length === 0) return null;
+        const lines = state.cart.teamItems
+          .map((i) => ({ ...i, /* keep stub */ }));
+        const memberCount = state.team.members.length;
+        const status: Order['status'] = memberCount >= TEAM_MAX_MEMBERS ? 'confirmed' : 'pending_participants';
+        const order: Order = {
+          id: orderNumber(),
+          kind: 'team',
+          status,
+          total: 0,
+          city: state.profile?.city ?? '',
+          address: '',
+          deliveryMethod: 'pickup',
+          paymentMethod: 'card',
+          itemCount: lines.reduce((s, l) => s + l.quantity, 0),
+          createdAt: new Date().toISOString(),
+          teamId: state.team.id,
+          membersNeeded: TEAM_MAX_MEMBERS,
+          membersAtOrder: memberCount,
+        };
+        dispatch({ type: 'SET', payload: { teamOrders: [...state.teamOrders, order] } });
+        return order;
       },
 
       addToCart: (kind, productId, qty = 1) => {
@@ -201,6 +282,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
           ? items.map((i) => (i.productId === productId ? { ...i, quantity: i.quantity + qty } : i))
           : [...items, { productId, quantity: qty }];
         setCart({ ...state.cart, [key]: nextItems });
+        if (kind === 'team' && items.length === 0) awardCouponInternal('first_purchase');
       },
 
       removeFromCart: (kind, productId) => {
@@ -225,13 +307,22 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         setCart({ ...state.cart, [key]: [] });
       },
 
+      saveProduct: (id) => {
+        if (state.savedProducts.includes(id)) return;
+        dispatch({ type: 'SET', payload: { savedProducts: [...state.savedProducts, id] } });
+      },
+
+      unsaveProduct: (id) => {
+        dispatch({ type: 'SET', payload: { savedProducts: state.savedProducts.filter((s) => s !== id) } });
+      },
+
       markViewed: (productId) => {
         const next = [productId, ...state.recentlyViewed.filter((id) => id !== productId)].slice(0, 8);
         dispatch({ type: 'SET', payload: { recentlyViewed: next } });
       },
 
       placeOrder: (draft) => {
-        const order: Order = { ...draft, id: orderNumber(), createdAt: new Date().toISOString() };
+        const order: Order = { ...draft, id: orderNumber(), status: draft.status ?? 'confirmed', createdAt: new Date().toISOString() };
         const key = draft.kind === 'team' ? 'teamItems' : 'individualItems';
         dispatch({
           type: 'SET',

@@ -52,9 +52,12 @@ export type CartState = {
 
 export type CartKind = 'individual' | 'team';
 
+export type OrderStatus = 'pending_participants' | 'confirmed' | 'shipped' | 'delivered';
+
 export type Order = {
   id: string;
   kind: CartKind;
+  status: OrderStatus;
   total: number;
   city: string;
   address: string;
@@ -62,6 +65,21 @@ export type Order = {
   paymentMethod: string;
   itemCount: number;
   createdAt: string;
+  teamId?: string;
+  membersNeeded?: number;
+  membersAtOrder?: number;
+};
+
+export type CouponType = 'newcomer' | 'team_player' | 'first_purchase';
+
+export type Coupon = {
+  id: string;
+  type: CouponType;
+  title: string;
+  description: string;
+  discount: number;
+  earnedAt: string;
+  usedAt?: string;
 };
 
 export type Category = {
