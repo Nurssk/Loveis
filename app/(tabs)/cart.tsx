@@ -136,6 +136,24 @@ export default function CartScreen() {
             </View>
           ) : null}
 
+          {tab === 'team' && !state.team ? (
+            <View style={styles.noTeamCard}>
+              <View style={styles.noTeamHeader}>
+                <Ionicons name="alert-circle" size={18} color={colors.warning} />
+                <Text style={styles.noTeamTitle}>Вы не в команде</Text>
+              </View>
+              <Text style={styles.noTeamText}>
+                Чтобы получить скидку до 30%, создайте команду или присоединитесь по коду.
+              </Text>
+              <AppButton
+                title="Создать или присоединиться"
+                icon="people-outline"
+                onPress={() => router.push('/(tabs)/team')}
+                style={styles.noTeamBtn}
+              />
+            </View>
+          ) : null}
+
           <View style={styles.lines}>
             {active.lines.map((l) => (
               <Line key={l.product.id} line={l} kind={tab} />
@@ -185,6 +203,21 @@ const styles = StyleSheet.create({
   content: { marginTop: spacing.lg },
   teamInfo: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.successSoft, padding: spacing.md, borderRadius: radii.sm, marginBottom: spacing.md },
   teamInfoText: { ...typography.caption, color: colors.success, fontWeight: '700', flex: 1 },
+  noTeamCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.warning,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    ...shadows.card,
+  },
+  noTeamHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xs },
+  noTeamTitle: { ...typography.bodyStrong, color: colors.text },
+  noTeamText: { ...typography.caption, color: colors.textSecondary, lineHeight: 18 },
+  noTeamBtn: { marginTop: spacing.md },
   lines: { gap: spacing.md },
   line: {
     flexDirection: 'row',

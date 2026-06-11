@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { AppButton } from '@/components/AppButton';
 import { Avatar } from '@/components/AvatarGroup';
@@ -10,6 +10,8 @@ import { SectionHeader } from '@/components/SectionHeader';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { useToast } from '@/components/Toast';
 import { categoryLabel } from '@/data/categories';
+import { getProduct } from '@/data/products';
+import { ProductImage } from '@/components/ProductImage';
 import { colors, radii, shadows, spacing, typography } from '@/constants/theme';
 import { useApp } from '@/store/AppContext';
 import { formatPhoneInput, formatPrice } from '@/utils/format';
@@ -32,7 +34,7 @@ const DEMO_TEAM = ['p2', 'p5', 'p13'];
 export default function ProfileScreen() {
   const router = useRouter();
   const toast = useToast();
-  const { state, logout, resetAll, setInterests, createTeam, addToCart, clearCart } = useApp();
+  const { state, logout, resetAll, setInterests, createTeam, addToCart, clearCart, unsaveProduct } = useApp();
   const [showDemo, setShowDemo] = useState(false);
 
   const profile = state.profile;
@@ -90,6 +92,46 @@ export default function ProfileScreen() {
           profile.interests.map((id) => <Badge key={id} label={categoryLabel(id)} />)
         )}
       </View>
+
+      {/* Saved products */}
+      {state.savedProducts.length > 0 ? (
+        <View style={styles.savedSection}>
+          <SectionHeader title="Сохранённые товары" icon="bookmark-outline" iconColor={colors.primary} />
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.savedScrollContent}
+            style={styles.savedScroll}
+          >
+            {state.savedProducts.map((id) => {
+              const product = getProduct(id);
+              if (!product) return null;
+              return (
+                <View key={id} style={styles.savedCard}>
+                  <Pressable
+                    onPress={() => router.push(`/product/${id}`)}
+                    accessibilityRole="button"
+                    accessibilityLabel={product.title}
+                  >
+                    <ProductImage uri={product.image} category={product.category} style={styles.savedCardImage} iconSize={24} />
+                    <Text style={styles.savedCardTitle} numberOfLines={2}>{product.title}</Text>
+                    <Text style={styles.savedCardPrice}>{formatPrice(product.regularPrice)}</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => unsaveProduct(id)}
+                    style={styles.savedCardRemove}
+                    hitSlop={6}
+                    accessibilityRole="button"
+                    accessibilityLabel="Убрать"
+                  >
+                    <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+                  </Pressable>
+                </View>
+              );
+            })}
+          </ScrollView>
+        </View>
+      ) : null}
 
       {/* Demo panel */}
       <Pressable
@@ -220,6 +262,22 @@ const styles = StyleSheet.create({
   edit: { ...typography.caption, color: colors.primary, fontWeight: '700', paddingBottom: spacing.md },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.md },
   noInterests: { ...typography.body, color: colors.textMuted },
+  savedSection: { marginBottom: spacing.md },
+  savedScroll: { marginTop: spacing.sm },
+  savedScrollContent: { flexDirection: 'row', gap: spacing.sm, paddingRight: spacing.md },
+  savedCard: {
+    width: 120,
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+    ...shadows.card,
+  },
+  savedCardImage: { width: 120, height: 80 },
+  savedCardTitle: { ...typography.small, color: colors.text, padding: spacing.sm, paddingBottom: 2, lineHeight: 16 },
+  savedCardPrice: { ...typography.caption, color: colors.primary, fontWeight: '700', paddingHorizontal: spacing.sm, paddingBottom: spacing.sm },
+  savedCardRemove: { position: 'absolute', top: 4, right: 4, backgroundColor: colors.surface, borderRadius: 9 },
   demoToggle: {
     flexDirection: 'row',
     alignItems: 'center',
