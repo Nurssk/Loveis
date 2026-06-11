@@ -18,3 +18,10 @@ export function orderNumber(): string {
   const n = Math.floor(100000 + Math.random() * 900000);
   return `KZ-${n}`;
 }
+
+/** Halyk invoice_id — digits only, 6–15 знаков, уникальный для shop. */
+export function generateInvoiceId(): string {
+  const ts = Date.now().toString();
+  const rnd = Math.floor(10 + Math.random() * 90).toString();
+  return `${ts}${rnd}`;
+}
