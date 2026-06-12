@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
 import { Badge } from '@/components/Badge';
+import { CheckList } from '@/components/CheckList';
 import { EmptyState } from '@/components/EmptyState';
 import { ProductImage } from '@/components/ProductImage';
 import { Rating } from '@/components/Rating';
@@ -17,6 +18,7 @@ import { useApp } from '@/store/AppContext';
 import { useProductsCtx } from '@/store/ProductsContext';
 import { applyDiscount, teamDiscountPercent } from '@/utils/discount';
 import { formatPrice, memberWord } from '@/utils/format';
+import { batchProgress } from '@/utils/seller';
 
 const PREVIEW_TEAM_SIZE = 3;
 
@@ -143,18 +145,16 @@ export default function ProductDetailScreen() {
               </View>
             </View>
 
-            <View style={styles.priceDivider} />
-
-            <View style={styles.priceTop}>
-              <View>
-                <Text style={[styles.priceLabel, { color: colors.success }]}>
-                  Цена в команде {hasTeam ? `(${teamSize} ${memberWord(teamSize)})` : `(пример: ${teamSize})`}
-                </Text>
+            <View style={styles.teamBlock}>
+              <Text style={styles.teamLabel}>
+                Цена в команде {hasTeam ? `(${teamSize} ${memberWord(teamSize)})` : `(пример: ${teamSize})`}
+              </Text>
+              <View style={styles.teamRow}>
                 <Text style={styles.teamPrice}>{formatPrice(tPrice)}</Text>
-              </View>
-              <View style={styles.savingsBox}>
-                <Text style={styles.savingsLabel}>Экономия</Text>
-                <Text style={styles.savingsValue}>{formatPrice(savings)}</Text>
+                <View style={styles.savingsBox}>
+                  <Text style={styles.savingsLabel}>Вы экономите</Text>
+                  <Text style={styles.savingsValue}>{formatPrice(savings)}</Text>
+                </View>
               </View>
             </View>
 
@@ -165,6 +165,48 @@ export default function ProductDetailScreen() {
               </Text>
             </View>
           </View>
+
+          {/* Seller group-buy target (only for merchant-listed products) */}
+          {product.sellerId && product.groupPrice && product.minBatch ? (
+            <View style={styles.groupCard}>
+              <View style={styles.groupHeader}>
+                <Ionicons name="storefront-outline" size={16} color={colors.savingsDeep} />
+                <Text style={styles.groupHeaderText}>Оптовая цена от продавца</Text>
+              </View>
+              <View style={styles.groupRow}>
+                <View>
+                  <Text style={styles.groupPriceLabel}>При наборе группы</Text>
+                  <Text style={styles.groupPrice}>{formatPrice(product.groupPrice)}</Text>
+                </View>
+                <View style={styles.groupTargetBox}>
+                  <Text style={styles.groupTargetText}>
+                    {batchProgress(product).current} / {batchProgress(product).target}
+                  </Text>
+                  <Text style={styles.groupTargetLabel}>{memberWord(batchProgress(product).target)}</Text>
+                </View>
+              </View>
+              <View style={styles.groupTrack}>
+                <View style={[styles.groupFill, { width: `${batchProgress(product).percent}%` }]} />
+              </View>
+              <Text style={styles.groupHint}>
+                {batchProgress(product).reached
+                  ? 'Группа собрана — оптовая цена доступна!'
+                  : `Ещё ${batchProgress(product).remaining} участников до оптовой цены`}
+              </Text>
+            </View>
+          ) : null}
+
+          <Text style={styles.sectionTitle}>Что входит</Text>
+          <CheckList
+            items={[
+              `Доставка в ${product.city} — 2–4 дня`,
+              '−5% за каждого участника',
+              'До −30% в команде',
+              'Оплата Kaspi / Halyk / картой',
+              'Возврат в течение 14 дней',
+              'Гарантия качества',
+            ]}
+          />
         </View>
       </ScreenContainer>
 
@@ -296,13 +338,27 @@ const styles = StyleSheet.create({
   regularPrice: { ...typography.h3, color: colors.textMuted, textDecorationLine: 'line-through', marginTop: 2 },
   discountTag: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.success, paddingHorizontal: spacing.md, paddingVertical: 6, borderRadius: radii.pill },
   discountTagText: { ...typography.bodyStrong, color: colors.textInverse },
-  priceDivider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginVertical: spacing.md },
-  teamPrice: { ...typography.display, color: colors.text, marginTop: 2 },
+  teamBlock: { backgroundColor: colors.successSoft, borderRadius: radii.md, padding: spacing.md, marginTop: spacing.md },
+  teamLabel: { ...typography.captionStrong, color: colors.savingsDeep },
+  teamRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: spacing.xs },
+  teamPrice: { ...typography.savingsHero, color: colors.savingsDeep },
   savingsBox: { alignItems: 'flex-end' },
-  savingsLabel: { ...typography.caption, color: colors.textSecondary },
-  savingsValue: { ...typography.h3, color: colors.success, marginTop: 2 },
+  savingsLabel: { ...typography.caption, color: colors.savingsDeep },
+  savingsValue: { ...typography.h2, color: colors.success, marginTop: 2 },
   explain: { flexDirection: 'row', gap: spacing.sm, marginTop: spacing.lg, backgroundColor: colors.surfaceAlt, padding: spacing.md, borderRadius: radii.sm },
   explainText: { ...typography.caption, color: colors.textSecondary, flex: 1, lineHeight: 18 },
+  groupCard: { backgroundColor: colors.successSoft, borderRadius: radii.lg, padding: spacing.lg, marginTop: spacing.lg },
+  groupHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  groupHeaderText: { ...typography.captionStrong, color: colors.savingsDeep },
+  groupRow: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', marginTop: spacing.md },
+  groupPriceLabel: { ...typography.caption, color: colors.savingsDeep },
+  groupPrice: { ...typography.h1, color: colors.savingsDeep, marginTop: 2 },
+  groupTargetBox: { alignItems: 'flex-end' },
+  groupTargetText: { ...typography.h3, color: colors.savingsDeep },
+  groupTargetLabel: { ...typography.small, color: colors.savingsDeep },
+  groupTrack: { height: 8, borderRadius: radii.pill, backgroundColor: colors.surface, marginTop: spacing.md, overflow: 'hidden' },
+  groupFill: { height: '100%', borderRadius: radii.pill, backgroundColor: colors.success },
+  groupHint: { ...typography.caption, color: colors.savingsDeep, marginTop: spacing.sm },
   actionBar: { backgroundColor: colors.surface, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
   actionInner: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.md, maxWidth: LAYOUT.maxContentWidth, alignSelf: 'center', width: '100%' },
   actionBtn: { flex: 1 },

@@ -1,0 +1,308 @@
+import { Product } from '@/types';
+
+/**
+ * Mock product catalog. Images use stable Unsplash URLs; the UI degrades
+ * gracefully if an image fails to load (see ProductImage component).
+ */
+export const SEED_PRODUCTS: Product[] = [
+  {
+    id: 'p1',
+    title: 'Смартфон Galaxy A55 256GB',
+    description:
+      'Большой Super AMOLED экран 6.6", тройная камера 50 Мп, батарея 5000 мА·ч и быстрая зарядка. Отличный выбор на каждый день.',
+    category: 'smartphones',
+    marketplace: 'Kaspi Магазин',
+    image: 'https://images.unsplash.com/photo-1610945265064-0e34e5519bbf?w=600&q=80',
+    regularPrice: 249990,
+    rating: 4.7,
+    city: 'Алматы',
+    tags: ['популярное', 'хит'],
+    popularity: 95,
+    activeBuyers: 42,
+  },
+  {
+    id: 'p2',
+    title: 'iPhone 15 128GB',
+    description:
+      'Дисплей Super Retina XDR, чип A16 Bionic, камера 48 Мп и USB-C. Производительность и качество съёмки флагманского уровня.',
+    category: 'smartphones',
+    marketplace: 'Technodom',
+    image: 'https://images.unsplash.com/photo-1592286927505-1def25115558?w=600&q=80',
+    regularPrice: 469990,
+    rating: 4.9,
+    city: 'Астана',
+    tags: ['флагман'],
+    popularity: 98,
+    activeBuyers: 67,
+  },
+  {
+    id: 'p3',
+    title: 'Ноутбук Lenovo IdeaPad 5 Ryzen 5',
+    description:
+      '15.6" Full HD, Ryzen 5, 16 ГБ ОЗУ, SSD 512 ГБ. Лёгкий и быстрый ноутбук для учёбы и работы.',
+    category: 'laptops',
+    marketplace: 'Technodom',
+    image: 'https://images.unsplash.com/photo-1496181133206-80ce9b88a853?w=600&q=80',
+    regularPrice: 359990,
+    rating: 4.6,
+    city: 'Алматы',
+    tags: ['работа', 'учёба'],
+    popularity: 88,
+    activeBuyers: 31,
+  },
+  {
+    id: 'p4',
+    title: 'MacBook Air 13" M3',
+    description:
+      'Чип Apple M3, 8 ГБ объединённой памяти, SSD 256 ГБ. Тонкий металлический корпус и до 18 часов работы.',
+    category: 'laptops',
+    marketplace: 'iPoint',
+    image: 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?w=600&q=80',
+    regularPrice: 719990,
+    rating: 4.9,
+    city: 'Астана',
+    tags: ['премиум'],
+    popularity: 91,
+    activeBuyers: 24,
+  },
+  {
+    id: 'p5',
+    title: 'Робот-пылесос Xiaomi Robot Vacuum',
+    description:
+      'Лазерная навигация, влажная уборка, управление со смартфона. Сам строит карту квартиры и убирает по расписанию.',
+    category: 'appliances',
+    marketplace: 'Mechta',
+    image: 'https://images.unsplash.com/photo-1603618000256-65e3f1e6f6f9?w=600&q=80',
+    regularPrice: 129990,
+    rating: 4.5,
+    city: 'Шымкент',
+    tags: ['умный дом', 'выгодно'],
+    popularity: 84,
+    activeBuyers: 53,
+  },
+  {
+    id: 'p6',
+    title: 'Кофемашина De’Longhi Magnifica',
+    description:
+      'Автоматическая кофемашина с капучинатором. Свежемолотый эспрессо и капучино одним нажатием.',
+    category: 'appliances',
+    marketplace: 'Sulpak',
+    image: 'https://images.unsplash.com/photo-1517668808822-9ebb02f2a0e6?w=600&q=80',
+    regularPrice: 219990,
+    rating: 4.7,
+    city: 'Алматы',
+    tags: ['для дома'],
+    popularity: 76,
+    activeBuyers: 18,
+  },
+  {
+    id: 'p7',
+    title: 'Набор по уходу за кожей CeraVe',
+    description:
+      'Очищающий гель, увлажняющий крем и SPF. Базовый уход, рекомендованный дерматологами.',
+    category: 'cosmetics',
+    marketplace: 'Mon Amie',
+    image: 'https://images.unsplash.com/photo-1556228720-195a672e8a03?w=600&q=80',
+    regularPrice: 32990,
+    rating: 4.8,
+    city: 'Алматы',
+    tags: ['уход', 'бестселлер'],
+    popularity: 89,
+    activeBuyers: 74,
+  },
+  {
+    id: 'p8',
+    title: 'Парфюм Dior Sauvage 100ml',
+    description:
+      'Свежий древесно-пряный аромат. Стойкий парфюм для повседневного и вечернего образа.',
+    category: 'cosmetics',
+    marketplace: 'Golden Apple',
+    image: 'https://images.unsplash.com/photo-1541643600914-78b084683601?w=600&q=80',
+    regularPrice: 64990,
+    rating: 4.9,
+    city: 'Астана',
+    tags: ['премиум'],
+    popularity: 82,
+    activeBuyers: 29,
+  },
+  {
+    id: 'p9',
+    title: 'Зимняя куртка-пуховик унисекс',
+    description:
+      'Тёплый пуховик с водоотталкивающей пропиткой. Лёгкий, держит тепло до −25°C — то, что нужно зимой.',
+    category: 'clothing',
+    marketplace: 'Lamoda',
+    image: 'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=600&q=80',
+    regularPrice: 45990,
+    rating: 4.4,
+    city: 'Караганда',
+    tags: ['зима', 'выгодно'],
+    popularity: 79,
+    activeBuyers: 61,
+  },
+  {
+    id: 'p10',
+    title: 'Кроссовки Nike Air Zoom',
+    description:
+      'Беговые кроссовки с амортизацией Zoom Air. Дышащий верх и цепкая подошва для города и спорта.',
+    category: 'clothing',
+    marketplace: 'Lamoda',
+    image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600&q=80',
+    regularPrice: 54990,
+    rating: 4.6,
+    city: 'Алматы',
+    tags: ['спорт', 'стиль'],
+    popularity: 86,
+    activeBuyers: 48,
+  },
+  {
+    id: 'p11',
+    title: 'Постельное бельё сатин 2-спальное',
+    description:
+      'Комплект из плотного сатина: пододеяльник, простыня и две наволочки. Приятная гладкая ткань.',
+    category: 'home',
+    marketplace: 'Halyk Market',
+    image: 'https://images.unsplash.com/photo-1522771739844-6a9f6d5f14af?w=600&q=80',
+    regularPrice: 24990,
+    rating: 4.5,
+    city: 'Тараз',
+    tags: ['для дома', 'уют'],
+    popularity: 70,
+    activeBuyers: 35,
+  },
+  {
+    id: 'p12',
+    title: 'Набор кухонных ножей с подставкой',
+    description:
+      'Шесть стальных ножей и деревянная подставка. Острая заточка и удобные рукояти для любой готовки.',
+    category: 'home',
+    marketplace: 'Mechta',
+    image: 'https://images.unsplash.com/photo-1593618998160-e34014e67546?w=600&q=80',
+    regularPrice: 18990,
+    rating: 4.3,
+    city: 'Шымкент',
+    tags: ['кухня'],
+    popularity: 64,
+    activeBuyers: 22,
+  },
+  {
+    id: 'p13',
+    title: 'Гантели разборные 2×20 кг',
+    description:
+      'Комплект разборных гантелей с дисками. Регулируемый вес для домашних тренировок любого уровня.',
+    category: 'sport',
+    marketplace: 'Sportmaster',
+    image: 'https://images.unsplash.com/photo-1638536532686-d610adfc8e5c?w=600&q=80',
+    regularPrice: 39990,
+    rating: 4.7,
+    city: 'Астана',
+    tags: ['фитнес', 'дом'],
+    popularity: 72,
+    activeBuyers: 40,
+  },
+  {
+    id: 'p14',
+    title: 'Велосипед горный 27.5"',
+    description:
+      'Алюминиевая рама, 21 скорость, дисковые тормоза. Надёжный велосипед для города и лёгкого бездорожья.',
+    category: 'sport',
+    marketplace: 'Sportmaster',
+    image: 'https://images.unsplash.com/photo-1485965120184-e220f721d03e?w=600&q=80',
+    regularPrice: 119990,
+    rating: 4.6,
+    city: 'Алматы',
+    tags: ['актив', 'выгодно'],
+    popularity: 77,
+    activeBuyers: 33,
+  },
+  {
+    id: 'p15',
+    title: 'Конструктор LEGO City 800 деталей',
+    description:
+      'Большой игровой набор LEGO City. Развивает моторику и фантазию — подарок, который любят дети.',
+    category: 'kids',
+    marketplace: 'Marwin',
+    image: 'https://images.unsplash.com/photo-1558060370-d644479cb6f7?w=600&q=80',
+    regularPrice: 29990,
+    rating: 4.9,
+    city: 'Караганда',
+    tags: ['подарок', 'дети'],
+    popularity: 81,
+    activeBuyers: 56,
+  },
+  {
+    id: 'p16',
+    title: 'Детская автолюлька 0+',
+    description:
+      'Автокресло группы 0+ с боковой защитой и мягким вкладышем. Безопасность для самых маленьких пассажиров.',
+    category: 'kids',
+    marketplace: 'Marwin',
+    image: 'https://images.unsplash.com/photo-1632158844366-5a663c9b8a1c?w=600&q=80',
+    regularPrice: 49990,
+    rating: 4.5,
+    city: 'Шымкент',
+    tags: ['безопасность'],
+    popularity: 60,
+    activeBuyers: 19,
+  },
+  {
+    id: 'p17',
+    title: 'Видеорегистратор 70mai Dash Cam',
+    description:
+      'Full HD запись, широкий угол обзора и ночная съёмка. Компактный регистратор с управлением со смартфона.',
+    category: 'auto',
+    marketplace: 'Kaspi Магазин',
+    image: 'https://images.unsplash.com/photo-1449965408869-eaa3f722e40d?w=600&q=80',
+    regularPrice: 27990,
+    rating: 4.4,
+    city: 'Актобе',
+    tags: ['авто', 'гаджет'],
+    popularity: 68,
+    activeBuyers: 27,
+  },
+  {
+    id: 'p18',
+    title: 'Набор автомобильных шин 4 шт R16',
+    description:
+      'Всесезонный комплект из четырёх шин R16. Хорошее сцепление и тихий ход — выгоднее брать командой.',
+    category: 'auto',
+    marketplace: 'Technodom',
+    image: 'https://images.unsplash.com/photo-1568605117036-5fe5e7bab0b7?w=600&q=80',
+    regularPrice: 159990,
+    rating: 4.6,
+    city: 'Астана',
+    tags: ['авто', 'высокая экономия'],
+    popularity: 74,
+    activeBuyers: 38,
+  },
+];
+
+/**
+ * Runtime product registry. The 18 seed products are static; seller-created
+ * products are injected at runtime via setSellerProducts() so they surface
+ * everywhere the catalog is read — buyer feed, search, detail and cart — using
+ * the exact same getProduct()/getAllProducts() accessors. The persisted seller
+ * products live in AppContext, which keeps this registry in sync.
+ */
+let sellerProducts: Product[] = [];
+let index: Record<string, Product> = Object.fromEntries(SEED_PRODUCTS.map((p) => [p.id, p]));
+
+function rebuildIndex() {
+  // Seller products win id collisions (none expected) and appear first.
+  index = Object.fromEntries([...SEED_PRODUCTS, ...sellerProducts].map((p) => [p.id, p]));
+}
+
+/** Sync the registry with the persisted seller catalog (called from AppContext). */
+export function setSellerProducts(list: Product[]): void {
+  sellerProducts = Array.isArray(list) ? list : [];
+  rebuildIndex();
+}
+
+/** Full catalog — seller products first, then the seed catalog. */
+export function getAllProducts(): Product[] {
+  return [...sellerProducts, ...SEED_PRODUCTS];
+}
+
+export function getProduct(id: string): Product | undefined {
+  return index[id];
+}

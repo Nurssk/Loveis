@@ -2,11 +2,13 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import React, { createContext, useContext, useEffect, useMemo, useReducer } from 'react';
 
+import { setSellerProducts } from '@/data/products';
+import { categoryImage, makeSampleSellerProducts } from '@/data/sellerSamples';
 import { auth } from '@/lib/firebase';
 import * as ordersRepo from '@/lib/ordersRepo';
 import * as teamsRepo from '@/lib/teamsRepo';
 import { awardCoupon, createOrInitUser, subscribeToUser, updateUser } from '@/lib/usersRepo';
-import { CartItem, CartKind, CartState, Coupon, CouponType, Order, ShoppingTeam, TeamMember, UserProfile } from '@/types';
+import { CartItem, CartKind, CartState, Coupon, CouponType, Order, Product, SellerProductInput, ShoppingTeam, TeamMember, UserProfile } from '@/types';
 import { orderNumber, uid } from '@/utils/ids';
 
 const DEMO_MEMBER_NAMES = ['Алия', 'Нуржан', 'Данияр', 'Аружан', 'Ербол', 'Сабина'];
@@ -21,6 +23,7 @@ type LocalState = {
   cart: CartState;
   recentlyViewed: string[];
   lastOrder: Order | null;
+  sellerProducts: Product[];
   savedProducts: string[];
 };
 
@@ -29,7 +32,7 @@ type State = LocalState & {
   pendingPhone: string;
   profile: UserProfile | null;
   coupons: Coupon[];
-  teamOrders: Order[];   // Firestore-driven via subscribeToOrders
+  teamOrders: Order[];
   hydrated: boolean;
 };
 
@@ -45,6 +48,7 @@ const initialState: State = {
   cart: emptyCart,
   recentlyViewed: [],
   lastOrder: null,
+  sellerProducts: [],
   savedProducts: [],
   hydrated: false,
 };
@@ -78,7 +82,7 @@ function reducer(state: State, action: Action): State {
     case 'SET':
       return { ...state, ...action.payload };
     case 'RESET_LOCAL':
-      return { ...state, team: null, cart: emptyCart, recentlyViewed: [], lastOrder: null, teamOrders: [], savedProducts: [], uid: null, pendingPhone: '', profile: null, coupons: [] };
+      return { ...state, team: null, cart: emptyCart, recentlyViewed: [], lastOrder: null, teamOrders: [], sellerProducts: [], savedProducts: [], uid: null, pendingPhone: '', profile: null, coupons: [] };
     default:
       return state;
   }
@@ -110,6 +114,11 @@ type AppContextValue = {
   removeFromCart: (kind: CartKind, productId: string) => void;
   setQuantity: (kind: CartKind, productId: string, qty: number) => void;
   clearCart: (kind: CartKind) => void;
+  // seller
+  becomeSeller: (storeName: string) => void;
+  addSellerProduct: (input: SellerProductInput) => Product | null;
+  updateSellerProduct: (id: string, patch: SellerProductInput) => void;
+  deleteSellerProduct: (id: string) => void;
   // saved products
   saveProduct: (id: string) => void;
   unsaveProduct: (id: string) => void;
@@ -138,6 +147,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             cart: parsed.cart ?? emptyCart,
             recentlyViewed: Array.isArray(parsed.recentlyViewed) ? parsed.recentlyViewed : [],
             lastOrder: parsed.lastOrder ?? null,
+            sellerProducts: Array.isArray(parsed.sellerProducts) ? parsed.sellerProducts : [],
             savedProducts: Array.isArray(parsed.savedProducts) ? parsed.savedProducts : [],
           },
         });
@@ -245,10 +255,16 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       cart: state.cart,
       recentlyViewed: state.recentlyViewed,
       lastOrder: state.lastOrder,
+      sellerProducts: state.sellerProducts,
       savedProducts: state.savedProducts,
     };
     AsyncStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(local)).catch(() => {});
-  }, [state.team, state.cart, state.recentlyViewed, state.lastOrder, state.savedProducts, state.hydrated]);
+  }, [state.team, state.cart, state.recentlyViewed, state.lastOrder, state.sellerProducts, state.savedProducts, state.hydrated]);
+
+  // ── 6. Sync seller product registry so products surface in buyer feed ─────
+  useEffect(() => {
+    setSellerProducts(state.sellerProducts);
+  }, [state.sellerProducts]);
 
   const value = useMemo<AppContextValue>(() => {
     const setCart = (cart: CartState) => dispatch({ type: 'SET', payload: { cart } });
@@ -324,7 +340,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         const used = state.team?.members.map((m) => m.name) ?? [];
         const next = DEMO_MEMBER_NAMES.find((n) => !used.includes(n)) ?? `Гость ${state.team?.members.length ?? 0}`;
         teamsRepo.addSyntheticMember(teamId, next).catch(() => {});
-        // coupon and order status re-check will happen when members snapshot fires
       },
 
       awardCoupon: (type) => { doAwardCoupon(type); },
@@ -387,6 +402,63 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       clearCart: (kind) => {
         const key = kind === 'team' ? 'teamItems' : 'individualItems';
         setCart({ ...state.cart, [key]: [] });
+      },
+
+      becomeSeller: (storeName) => {
+        if (!state.profile) return;
+        const name = storeName.trim() || 'Мой магазин';
+        const profile: UserProfile = { ...state.profile, isSeller: true, storeName: name };
+        const sellerProducts =
+          state.sellerProducts.length === 0
+            ? makeSampleSellerProducts(state.profile.id, name, state.profile.city)
+            : state.sellerProducts;
+        dispatch({ type: 'SET', payload: { profile, sellerProducts } });
+      },
+
+      addSellerProduct: (input) => {
+        if (!state.profile) return null;
+        const product: Product = {
+          id: uid('sp'),
+          sellerId: state.profile.id,
+          title: input.title.trim(),
+          description: input.description.trim(),
+          category: input.category,
+          marketplace: state.profile.storeName ?? 'Мой магазин',
+          image: input.image?.trim() || categoryImage(input.category),
+          regularPrice: input.regularPrice,
+          rating: 5.0,
+          city: state.profile.city,
+          tags: ['новинка'],
+          popularity: 60,
+          activeBuyers: 1 + Math.floor(Math.random() * 4),
+          minBatch: input.minBatch,
+          groupPrice: input.groupPrice,
+        };
+        dispatch({ type: 'SET', payload: { sellerProducts: [product, ...state.sellerProducts] } });
+        return product;
+      },
+
+      updateSellerProduct: (id, patch) => {
+        const sellerProducts = state.sellerProducts.map((p) =>
+          p.id === id
+            ? {
+                ...p,
+                title: patch.title.trim(),
+                description: patch.description.trim(),
+                category: patch.category,
+                marketplace: state.profile?.storeName ?? p.marketplace,
+                image: patch.image?.trim() || categoryImage(patch.category),
+                regularPrice: patch.regularPrice,
+                minBatch: patch.minBatch,
+                groupPrice: patch.groupPrice,
+              }
+            : p,
+        );
+        dispatch({ type: 'SET', payload: { sellerProducts } });
+      },
+
+      deleteSellerProduct: (id) => {
+        dispatch({ type: 'SET', payload: { sellerProducts: state.sellerProducts.filter((p) => p.id !== id) } });
       },
 
       saveProduct: (id) => {

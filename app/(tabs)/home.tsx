@@ -12,7 +12,6 @@ import {
   View,
 } from 'react-native';
 
-import { Avatar } from '@/components/AvatarGroup';
 import { CategoryChip } from '@/components/CategoryChip';
 import { EmptyState } from '@/components/EmptyState';
 import { ErrorMessage } from '@/components/ErrorMessage';
@@ -28,13 +27,6 @@ import { Product, UserProfile } from '@/types';
 import { lineCount } from '@/utils/cart';
 import { itemWord } from '@/utils/format';
 
-function greeting(): string {
-  const h = new Date().getHours();
-  if (h < 6) return 'Доброй ночи';
-  if (h < 12) return 'Доброе утро';
-  if (h < 18) return 'Добрый день';
-  return 'Добрый вечер';
-}
 
 type Scored = { product: Product; reason: string };
 
@@ -88,6 +80,7 @@ export default function HomeScreen() {
 
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<string | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const teamCount = state.team?.members.length ?? 0;
   const open = (id: string) => router.push(`/product/${id}`);
@@ -142,6 +135,35 @@ export default function HomeScreen() {
 
   return (
     <ScreenContainer padded={false} edges={['top']} scroll={false} contentStyle={styles.fill}>
+      {/* Top bar: PFP | Location | Search icon */}
+      <View style={styles.topBar}>
+        <Pressable onPress={() => router.push('/(tabs)/profile')} style={styles.avatarBtn} accessibilityLabel="Профиль">
+          <Text style={styles.avatarInitial}>
+            {(state.profile?.name ?? 'U')[0].toUpperCase()}
+          </Text>
+        </Pressable>
+
+        <View style={styles.locationBlock}>
+          <Text style={styles.locationLabel}>Местоположение</Text>
+          <View style={styles.cityRow}>
+            <Ionicons name="location-sharp" size={13} color={colors.primary} />
+            <Text style={styles.city}>{state.profile?.city ?? 'Алматы'}</Text>
+            <Ionicons name="chevron-down" size={13} color={colors.textMuted} />
+          </View>
+        </View>
+
+        <Pressable
+          onPress={() => {
+            if (searchOpen) setQuery('');
+            setSearchOpen((v) => !v);
+          }}
+          style={[styles.iconBtn, searchOpen && styles.iconBtnActive]}
+          accessibilityLabel="Поиск"
+        >
+          <Ionicons name={searchOpen ? 'close' : 'search'} size={20} color={searchOpen ? colors.primary : colors.text} />
+        </Pressable>
+      </View>
+
       <ScrollView
         style={styles.fill}
         contentContainerStyle={styles.scrollContent}
@@ -151,61 +173,39 @@ export default function HomeScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.primary} colors={[colors.primary]} />
         }
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <Text style={styles.greeting}>{greeting()},</Text>
-            <View style={styles.cityRow}>
-              <Ionicons name="location-outline" size={15} color={colors.primary} />
-              <Text style={styles.city}>{state.profile?.city ?? 'Алматы'}</Text>
+        {/* Collapsible search */}
+        {searchOpen && (
+          <View style={styles.searchRow}>
+            <View style={styles.search}>
+              <Ionicons name="search" size={18} color={colors.text} />
+              <TextInput
+                value={query}
+                onChangeText={setQuery}
+                placeholder="Поиск товаров и магазинов"
+                placeholderTextColor={colors.textMuted}
+                style={styles.searchInput}
+                returnKeyType="search"
+                autoFocus
+                accessibilityLabel="Поиск"
+              />
+              {query.length > 0 ? (
+                <Pressable onPress={() => setQuery('')} hitSlop={8} accessibilityLabel="Очистить">
+                  <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+                </Pressable>
+              ) : null}
             </View>
-          </View>
-          <View style={styles.headerRight}>
             <Pressable
-              onPress={() => toast.show('Новых уведомлений нет', 'info')}
-              style={styles.iconBtn}
+              onPress={() => setCategory(null)}
+              style={[styles.filterBtn, category && styles.filterBtnActive]}
               accessibilityRole="button"
-              accessibilityLabel="Уведомления"
+              accessibilityLabel="Сбросить фильтр"
             >
-              <Ionicons name="notifications-outline" size={22} color={colors.text} />
-              <View style={styles.dot} />
-            </Pressable>
-            <Pressable onPress={() => router.push('/(tabs)/profile')} accessibilityRole="button" accessibilityLabel="Профиль">
-              <Avatar name={state.profile?.name ?? 'Вы'} size={40} />
+              <Ionicons name="options-outline" size={20} color={category ? colors.primaryDark : colors.text} />
             </Pressable>
           </View>
-        </View>
+        )}
 
-        {/* Search */}
-        <View style={styles.searchRow}>
-          <View style={styles.search}>
-            <Ionicons name="search" size={18} color={colors.textMuted} />
-            <TextInput
-              value={query}
-              onChangeText={setQuery}
-              placeholder="Поиск товаров, категорий, магазинов"
-              placeholderTextColor={colors.textMuted}
-              style={styles.searchInput}
-              returnKeyType="search"
-              accessibilityLabel="Поиск"
-            />
-            {query.length > 0 ? (
-              <Pressable onPress={() => setQuery('')} hitSlop={8} accessibilityLabel="Очистить">
-                <Ionicons name="close-circle" size={18} color={colors.textMuted} />
-              </Pressable>
-            ) : null}
-          </View>
-          <Pressable
-            onPress={() => setCategory(null)}
-            style={[styles.filterBtn, category && styles.filterBtnActive]}
-            accessibilityRole="button"
-            accessibilityLabel="Сбросить фильтр"
-          >
-            <Ionicons name="options-outline" size={20} color={category ? colors.textInverse : colors.text} />
-          </Pressable>
-        </View>
-
-        {/* Category chips */}
+        {/* Category strip */}
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
           <CategoryChip label="Все" selected={category === null} onPress={() => setCategory(null)} />
           {CATEGORIES.map((c) => (
@@ -280,24 +280,14 @@ export default function HomeScreen() {
             )}
 
             <View style={styles.padX}>
-              <SectionHeader
-                title="Популярно в команде"
-                subtitle="Чаще всего покупают вместе"
-                icon="flame"
-                iconColor={colors.danger}
-              />
+              <SectionHeader title="Популярно в команде" subtitle="Чаще всего покупают вместе" icon="flame" iconColor={colors.danger} />
             </View>
             {renderShelf(popular)}
 
             {savings.length > 0 ? (
               <>
                 <View style={styles.padX}>
-                  <SectionHeader
-                    title="Лучшая экономия"
-                    subtitle="Максимальная выгода при покупке командой"
-                    icon="trending-down"
-                    iconColor={colors.success}
-                  />
+                  <SectionHeader title="Лучшая экономия" subtitle="Максимальная выгода при покупке командой" icon="trending-down" iconColor={colors.success} />
                 </View>
                 {renderShelf(savings)}
               </>
@@ -321,22 +311,51 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   fill: { flex: 1 },
   scrollContent: { paddingBottom: spacing.xxxl, flexGrow: 1 },
-  header: {
+
+  // ── Top bar (redesign) ──
+  topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
   },
-  headerLeft: {},
-  greeting: { ...typography.caption, color: colors.textSecondary },
-  cityRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 },
+  avatarBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: radii.pill,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarInitial: {
+    ...typography.bodyStrong,
+    color: colors.textInverse,
+  },
+  locationBlock: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  locationLabel: {
+    ...typography.caption,
+    color: colors.textSecondary,
+  },
+  cityRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 1 },
   city: { ...typography.h3, color: colors.text },
-  headerRight: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
-  iconBtn: { padding: 4 },
-  dot: { position: 'absolute', top: 4, right: 4, width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary },
-  searchRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.lg },
+  iconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: radii.pill,
+    backgroundColor: colors.surfaceStrong,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconBtnActive: {
+    backgroundColor: colors.primarySoft,
+  },
+
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.lg, marginTop: spacing.sm, marginBottom: spacing.xs },
   search: {
     flex: 1,
     flexDirection: 'row',
@@ -345,23 +364,23 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     borderWidth: 1.5,
     borderColor: colors.border,
-    borderRadius: radii.md,
-    paddingHorizontal: spacing.md,
-    minHeight: 50,
+    borderRadius: radii.pill,
+    paddingHorizontal: spacing.lg,
+    minHeight: 52,
   },
   searchInput: { flex: 1, ...typography.body, color: colors.text },
   filterBtn: {
-    width: 50,
-    height: 50,
-    borderRadius: radii.md,
+    width: 52,
+    height: 52,
+    borderRadius: radii.pill,
     borderWidth: 1.5,
     borderColor: colors.border,
     backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  filterBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  chips: { gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
+  filterBtnActive: { backgroundColor: colors.primarySoft, borderColor: colors.primarySoft },
+  chips: { gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: spacing.lg },
   center: { alignItems: 'center', justifyContent: 'center', paddingVertical: spacing.xxxl * 1.5, gap: spacing.md },
   centerLabel: { ...typography.body, color: colors.textSecondary },
   feed: {},
@@ -375,7 +394,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
     marginHorizontal: spacing.lg,
-    marginTop: spacing.sm,
+    marginBottom: spacing.sm,
     padding: spacing.md,
     borderRadius: radii.md,
     backgroundColor: colors.primarySoft,

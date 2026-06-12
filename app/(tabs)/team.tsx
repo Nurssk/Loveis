@@ -8,6 +8,7 @@ import QRCode from 'react-native-qrcode-svg';
 import { AppButton } from '@/components/AppButton';
 import { AppInput } from '@/components/AppInput';
 import { Avatar } from '@/components/AvatarGroup';
+import { CheckList } from '@/components/CheckList';
 import { ErrorMessage } from '@/components/ErrorMessage';
 import { SectionHeader } from '@/components/SectionHeader';
 import { ScreenContainer } from '@/components/ScreenContainer';
@@ -17,18 +18,13 @@ import { useApp } from '@/store/AppContext';
 import { useProductsCtx } from '@/store/ProductsContext';
 import { resolveLines } from '@/utils/cart';
 import { DISCOUNT_PER_MEMBER, MAX_DISCOUNT, nextDiscountThreshold, teamDiscountPercent } from '@/utils/discount';
+import { CouponType } from '@/types';
 import { formatPrice, memberWord } from '@/utils/format';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const TEAM_TTL_MS = 48 * 60 * 60 * 1000; // 48 hours
 const MILESTONES = [1, 2, 3, 4, 5, 6] as const;
-
-const BENEFITS = [
-  { icon: 'pricetags-outline', text: 'Скидка 5% за каждого участника команды' },
-  { icon: 'trending-down-outline', text: 'До 30% экономии на любом товаре' },
-  { icon: 'cube-outline', text: 'Одна общая доставка на всех' },
-] as const;
 
 // ─── Hooks ────────────────────────────────────────────────────────────────────
 
@@ -57,11 +53,7 @@ function useCountdown(createdAt: string): string | null {
   return remaining;
 }
 
-// ─── Coupons (catalog) ────────────────────────────────────────────────────────
-// Заработанные купоны живут в AppContext (state.coupons). Этот каталог нужен
-// только чтобы показывать незаработанные карточки (locked) на странице.
-
-import type { CouponType } from '@/types';
+// ─── Coupons catalog (locked/earned display) ──────────────────────────────────
 
 const COUPON_DISPLAY: { type: CouponType; title: string; description: string; discount: number }[] = [
   { type: 'newcomer',       title: 'Новичок',         description: 'За вступление в команду',          discount: 3 },
@@ -172,16 +164,15 @@ export default function TeamScreen() {
           Объединяйтесь с друзьями или соседями — и покупайте дешевле. Каждый участник снижает цену для всех.
         </Text>
 
-        <View style={styles.benefitsCard}>
-          {BENEFITS.map((b) => (
-            <View key={b.text} style={styles.benefitRow}>
-              <View style={styles.benefitIcon}>
-                <Ionicons name={b.icon as keyof typeof Ionicons.glyphMap} size={18} color={colors.primary} />
-              </View>
-              <Text style={styles.benefitText}>{b.text}</Text>
-            </View>
-          ))}
-        </View>
+        <Text style={styles.sectionTitle}>Что вы получите</Text>
+        <CheckList
+          items={[
+            'Скидка 5% за каждого участника',
+            'До 30% экономии на товарах',
+            'Одна общая доставка на всех',
+            'Чем больше команда — ниже цена',
+          ]}
+        />
 
         <AppButton title="Создать команду" icon="add" onPress={createTeam} style={styles.createBtn} />
 
@@ -488,6 +479,7 @@ const styles = StyleSheet.create({
   // ── Shared ──
   h1: { ...typography.h1, color: colors.text, marginTop: spacing.sm },
   lead: { ...typography.body, color: colors.textSecondary, marginTop: spacing.xs, lineHeight: 22 },
+  sectionTitle: { ...typography.h3, color: colors.text, marginTop: spacing.xl, marginBottom: spacing.md },
 
   // ── Empty state ──
   benefitsCard: {

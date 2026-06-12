@@ -90,6 +90,7 @@ export default function CartScreen() {
       }
     >
       <Text style={styles.h1}>Корзина</Text>
+      <Text style={styles.subtitle}>Проверьте товары и сумму со скидкой команды</Text>
 
       {/* Segmented control */}
       <View style={styles.segments}>
@@ -196,7 +197,8 @@ export default function CartScreen() {
 }
 
 const styles = StyleSheet.create({
-  h1: { ...typography.h1, color: colors.text, marginTop: spacing.sm },
+  h1: { ...typography.display, color: colors.text, marginTop: spacing.sm },
+  subtitle: { ...typography.body, color: colors.textSecondary, marginTop: spacing.xs },
   segments: { flexDirection: 'row', backgroundColor: colors.surfaceAlt, borderRadius: radii.md, padding: 4, marginTop: spacing.lg },
   segment: { flex: 1, paddingVertical: spacing.sm, borderRadius: radii.sm, alignItems: 'center' },
   segmentActive: { backgroundColor: colors.surface, ...shadows.card },
@@ -248,7 +250,7 @@ const styles = StyleSheet.create({
   grandLabel: { ...typography.h3, color: colors.text },
   grandValue: { ...typography.h2, color: colors.text },
   savingsPill: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, alignSelf: 'flex-start', backgroundColor: colors.successSoft, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radii.pill, marginTop: spacing.md },
-  savingsPillText: { ...typography.caption, color: colors.success, fontWeight: '700' },
+  savingsPillText: { ...typography.caption, color: colors.savingsDeep, fontWeight: '700' },
   footerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
   footerLabel: { ...typography.body, color: colors.textSecondary },
   footerTotal: { ...typography.h2, color: colors.text },

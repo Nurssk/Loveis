@@ -79,7 +79,7 @@ export default function InterestsScreen() {
 }
 
 const styles = StyleSheet.create({
-  title: { ...typography.h1, color: colors.text, marginTop: spacing.xl },
+  title: { ...typography.display, color: colors.text, marginTop: spacing.xl },
   subtitle: { ...typography.body, color: colors.textSecondary, marginTop: spacing.sm, lineHeight: 22 },
   counterRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.lg },
   counter: { ...typography.caption, color: colors.textMuted, fontWeight: '700' },

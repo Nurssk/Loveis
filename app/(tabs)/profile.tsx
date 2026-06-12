@@ -69,6 +69,29 @@ export default function ProfileScreen() {
         </View>
       </View>
 
+      {/* Seller cabinet entry */}
+      <Pressable
+        onPress={() => router.push(profile.isSeller ? '/(seller)/dashboard' : '/become-seller')}
+        style={styles.sellerCard}
+        accessibilityRole="button"
+        accessibilityLabel={profile.isSeller ? 'Открыть кабинет продавца' : 'Стать продавцом'}
+      >
+        <View style={styles.sellerIcon}>
+          <Ionicons name="storefront" size={22} color={colors.primary} />
+        </View>
+        <View style={styles.sellerBody}>
+          <Text style={styles.sellerTitle}>
+            {profile.isSeller ? 'Кабинет продавца' : 'Стать продавцом'}
+          </Text>
+          <Text style={styles.sellerSubtitle}>
+            {profile.isSeller
+              ? profile.storeName ?? 'Управляйте товарами и заказами'
+              : 'Размещайте товары и продавайте группам'}
+          </Text>
+        </View>
+        <Ionicons name="chevron-forward" size={20} color={colors.textMuted} />
+      </Pressable>
+
       {/* Details */}
       <View style={styles.card}>
         <DetailRow icon="location-outline" label="Город" value={profile.city} />
@@ -236,7 +259,7 @@ function DemoAction({
 }
 
 const styles = StyleSheet.create({
-  h1: { ...typography.h1, color: colors.text, marginTop: spacing.sm, marginBottom: spacing.lg },
+  h1: { ...typography.display, color: colors.text, marginTop: spacing.sm, marginBottom: spacing.lg },
   card: {
     backgroundColor: colors.surface,
     borderRadius: radii.lg,
@@ -253,6 +276,22 @@ const styles = StyleSheet.create({
   verifiedRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginTop: spacing.lg, backgroundColor: colors.successSoft, padding: spacing.md, borderRadius: radii.sm },
   verifiedText: { ...typography.caption, color: colors.success, fontWeight: '700', flex: 1 },
   deviceId: { ...typography.small, color: colors.success, letterSpacing: 0.5 },
+  sellerCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
+    ...shadows.card,
+  },
+  sellerIcon: { width: 44, height: 44, borderRadius: radii.md, backgroundColor: colors.primarySoft, alignItems: 'center', justifyContent: 'center' },
+  sellerBody: { flex: 1 },
+  sellerTitle: { ...typography.bodyStrong, color: colors.text },
+  sellerSubtitle: { ...typography.caption, color: colors.textSecondary, marginTop: 2 },
   detailRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.xs },
   detailLabel: { ...typography.body, color: colors.textSecondary, flex: 1 },
   detailValue: { ...typography.bodyStrong, color: colors.text },

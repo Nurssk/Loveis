@@ -13,6 +13,9 @@ export type Product = {
   tags: string[];
   popularity: number;
   activeBuyers: number;
+  sellerId?: string;
+  minBatch?: number;
+  groupPrice?: number;
 };
 
 export type UserProfile = {
@@ -24,7 +27,20 @@ export type UserProfile = {
   interests: string[];
   isVerified: boolean;
   deviceId: string;
+  isSeller?: boolean;
+  storeName?: string;
   currentTeamId?: string;
+};
+
+/** Draft passed from the add/edit product form into the store. */
+export type SellerProductInput = {
+  title: string;
+  description: string;
+  category: string;
+  regularPrice: number;
+  groupPrice?: number;
+  minBatch: number;
+  image?: string;
 };
 
 export type TeamMember = {
@@ -86,6 +102,6 @@ export type Coupon = {
 export type Category = {
   id: string;
   label: string;
-  icon: string; // Ionicons name
+  icon: string;
   color: string;
 };

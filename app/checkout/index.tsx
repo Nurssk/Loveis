@@ -7,8 +7,10 @@ import { Alert, Platform, Pressable, StyleSheet, Text, View } from 'react-native
 import { AppButton } from '@/components/AppButton';
 import { AppInput } from '@/components/AppInput';
 import { LoadingOverlay } from '@/components/LoadingOverlay';
+import { OptionCard } from '@/components/OptionCard';
 import { ProductImage } from '@/components/ProductImage';
 import { ScreenContainer } from '@/components/ScreenContainer';
+import { StepProgress } from '@/components/StepProgress';
 import { useToast } from '@/components/Toast';
 import { colors, radii, shadows, spacing, typography } from '@/constants/theme';
 import { halykConfigured, paymentLinks } from '@/config/payment';
@@ -27,9 +29,16 @@ const STAGE_LABEL: Record<PaymentStage, string> = {
 };
 
 const DELIVERY_METHODS = [
-  { id: 'courier', label: 'Курьер', detail: '2–4 дня · 0 ₸', icon: 'bicycle-outline' },
-  { id: 'pickup', label: 'Пункт выдачи', detail: 'Завтра · 0 ₸', icon: 'storefront-outline' },
+  { id: 'courier', label: 'Курьер', detail: '2–4 дня · бесплатно', icon: 'bicycle-outline' },
+  { id: 'pickup', label: 'Пункт выдачи', detail: 'Завтра · бесплатно', icon: 'storefront-outline' },
 ] as const;
+
+const TITLES = ['Ваш заказ', 'Доставка', 'Оплата'];
+const SUBTITLES = [
+  'Проверьте товары и сумму со скидкой',
+  'Куда и как привезти заказ',
+  'Проверьте итог и подтвердите оплату',
+];
 
 export default function CheckoutScreen() {
   const router = useRouter();
@@ -42,6 +51,7 @@ export default function CheckoutScreen() {
   const items = kind === 'team' ? state.cart.teamItems : state.cart.individualItems;
   const summary = useMemo(() => summarize(items, getProduct, memberCount), [items, getProduct, memberCount]);
 
+  const [step, setStep] = useState(0);
   const [address, setAddress] = useState('');
   const [delivery, setDelivery] = useState<string>(DELIVERY_METHODS[0].id);
   const [touched, setTouched] = useState(false);
@@ -66,14 +76,8 @@ export default function CheckoutScreen() {
 
   const onPay = async () => {
     setTouched(true);
-    if (!canPay) {
-      console.log('[pay] click ignored — form invalid', { addressOk, items: summary.itemCount });
-      return;
-    }
+    if (!canPay) return;
 
-    console.log('[pay] click', { configured: halykConfigured(), kind, total: summary.finalTotal });
-
-    // Демо-fallback: creds не заданы → симулируем, но громко предупреждаем.
     if (!halykConfigured()) {
       toast.show('Demo-режим: Halyk creds не заданы', 'info');
       setStage('creating');
@@ -86,26 +90,16 @@ export default function CheckoutScreen() {
     }
 
     try {
-      // ── Шаг 1: создаём invoice на стороне Halyk
       setStage('creating');
       const profile = state.profile;
-      console.log('[pay] step 1: initPayment…');
-      // Намеренно НЕ передаём phone/email — у демо-юзера фейковый номер,
-      // Halyk пытается отправить SMS и падает с 1079.
       const init = await paymentService.initPayment({
         orderRef: `${kind}-${Date.now()}`,
         userId: profile?.id ?? 'guest',
         title: summary.lines[0]?.product.title ?? 'Заказ',
         amount: summary.finalTotal,
       });
-      console.log('[pay] invoice created', init);
 
-      // ── Шаг 2: открываем платёжную страницу Halyk.
-      // На web — обычный window.open в новой вкладке (openAuthSessionAsync
-      // на web дёргает history.back и ломает router-стек).
-      // На native — WebBrowser auth session.
       setStage('redirecting');
-      console.log('[pay] step 2: opening browser', { url: init.invoiceUrl });
       if (Platform.OS === 'web') {
         if (typeof window !== 'undefined') {
           window.open(init.invoiceUrl, '_blank', 'noopener,noreferrer');
@@ -116,10 +110,6 @@ export default function CheckoutScreen() {
           .catch(() => {});
       }
 
-      // ── Шаг 3: спрашиваем юзера, прошла ли оплата.
-      // Polling status сейчас не работает: test-creds Halyk рассогласованы
-      // (terminal не принадлежит clientId → resultCode 109). Когда саппорт
-      // выдаст правильный shop↔terminal pair, можно вернуть paymentService.pollStatus().
       setStage(null);
       const confirmed = await new Promise<boolean>((resolve) => {
         Alert.alert(
@@ -139,7 +129,6 @@ export default function CheckoutScreen() {
       }
       const order = placeLocalOrder();
       router.replace(`/checkout/success?orderId=${order.id}&invoice=${init.invoiceId}`);
-      return;
     } catch (err) {
       const msg =
         err instanceof PaymentError
@@ -147,22 +136,42 @@ export default function CheckoutScreen() {
           : err instanceof Error
             ? err.message
             : String(err);
-      console.error('[pay] failed:', msg, err);
       Alert.alert('Ошибка оплаты', msg);
     } finally {
       setStage(null);
     }
   };
 
+  const onPrimary = () => {
+    if (step === 1) {
+      setTouched(true);
+      if (!addressOk) return;
+    }
+    if (step < 2) {
+      setStep((s) => s + 1);
+      return;
+    }
+    onPay();
+  };
+
+  const onBack = () => {
+    if (step === 0) {
+      router.back();
+      return;
+    }
+    setStep((s) => s - 1);
+  };
+
   if (summary.itemCount === 0) {
     return (
       <ScreenContainer>
-        <Header onBack={() => router.back()} />
         <Text style={styles.emptyText}>Корзина пуста. Добавьте товары перед оформлением.</Text>
         <AppButton title="На главную" onPress={() => router.replace('/(tabs)/home')} />
       </ScreenContainer>
     );
   }
+
+  const primaryDisabled = step === 1 && !addressOk;
 
   return (
     <ScreenContainer
@@ -172,151 +181,151 @@ export default function CheckoutScreen() {
             <Text style={styles.footerLabel}>К оплате</Text>
             <Text style={styles.footerTotal}>{formatPrice(summary.finalTotal)}</Text>
           </View>
-          <AppButton title="Оплатить" icon="lock-closed" onPress={onPay} disabled={!canPay} />
+          <AppButton
+            title={step < 2 ? 'Продолжить' : 'Оплатить'}
+            icon={step < 2 ? 'arrow-forward' : 'lock-closed'}
+            onPress={onPrimary}
+            disabled={primaryDisabled}
+          />
+          <Pressable onPress={onBack} style={styles.backBtn} accessibilityRole="button">
+            <Text style={styles.backText}>Назад</Text>
+          </Pressable>
         </View>
       }
     >
-      <Header onBack={() => router.back()} />
+      {/* Progress */}
+      <View style={styles.progressTop}>
+        <StepProgress total={3} current={step + 1} />
+      </View>
+      <Text style={styles.stepCount}>Шаг {step + 1} из 3</Text>
 
-      {/* Order type */}
-      <View style={[styles.typeBanner, kind === 'team' ? styles.typeTeam : styles.typeIndividual]}>
-        <Ionicons name={kind === 'team' ? 'people' : 'person'} size={18} color={kind === 'team' ? colors.success : colors.info} />
-        <Text style={[styles.typeText, { color: kind === 'team' ? colors.success : colors.info }]}>
+      <Text style={styles.title}>{TITLES[step]}</Text>
+      <Text style={styles.subtitle}>{SUBTITLES[step]}</Text>
+
+      {/* Context chip */}
+      <View style={[styles.context, kind === 'team' ? styles.contextTeam : styles.contextIndividual]}>
+        <Ionicons name={kind === 'team' ? 'people' : 'person'} size={14} color={kind === 'team' ? colors.success : colors.text} />
+        <Text style={[styles.contextText, { color: kind === 'team' ? colors.savingsDeep : colors.text }]}>
           {kind === 'team' ? `Командный заказ · ${state.team?.name ?? ''}` : 'Индивидуальный заказ'}
         </Text>
       </View>
 
-      {/* Products */}
-      <Text style={styles.sectionTitle}>Товары ({summary.itemCount} {itemWord(summary.itemCount)})</Text>
-      <View style={styles.card}>
-        {summary.lines.map((l, i) => (
-          <View key={l.product.id} style={[styles.itemRow, i > 0 && styles.itemDivider]}>
-            <ProductImage uri={l.product.image} category={l.product.category} style={styles.itemImage} iconSize={22} />
-            <Text style={styles.itemTitle} numberOfLines={2}>{l.product.title}</Text>
-            <Text style={styles.itemQty}>×{l.quantity}</Text>
-            <Text style={styles.itemPrice}>{formatPrice(l.product.regularPrice * l.quantity)}</Text>
+      {/* Step 0 — order summary */}
+      {step === 0 ? (
+        <>
+          <Text style={styles.sectionTitle}>Товары ({summary.itemCount} {itemWord(summary.itemCount)})</Text>
+          <View style={styles.card}>
+            {summary.lines.map((l, i) => (
+              <View key={l.product.id} style={[styles.itemRow, i > 0 && styles.itemDivider]}>
+                <ProductImage uri={l.product.image} category={l.product.category} style={styles.itemImage} iconSize={22} />
+                <Text style={styles.itemTitle} numberOfLines={2}>{l.product.title}</Text>
+                <Text style={styles.itemQty}>×{l.quantity}</Text>
+                <Text style={styles.itemPrice}>{formatPrice(l.product.regularPrice * l.quantity)}</Text>
+              </View>
+            ))}
           </View>
-        ))}
-      </View>
+          <Summary summary={summary} />
+        </>
+      ) : null}
 
-      {/* Delivery */}
-      <Text style={styles.sectionTitle}>Доставка</Text>
-      <View style={styles.cityRow}>
-        <Ionicons name="location-outline" size={16} color={colors.textSecondary} />
-        <Text style={styles.cityText}>Город: {state.profile?.city ?? 'Алматы'}</Text>
-      </View>
-      <AppInput
-        label="Адрес доставки"
-        placeholder="Улица, дом, квартира"
-        leftIcon="home-outline"
-        value={address}
-        onChangeText={setAddress}
-        error={touched && !addressOk ? 'Укажите адрес доставки (минимум 5 символов)' : null}
-      />
-      <View style={styles.options}>
-        {DELIVERY_METHODS.map((d) => (
-          <Option
-            key={d.id}
-            selected={delivery === d.id}
-            icon={d.icon}
-            title={d.label}
-            subtitle={d.detail}
-            onPress={() => setDelivery(d.id)}
+      {/* Step 1 — delivery */}
+      {step === 1 ? (
+        <>
+          <View style={styles.cityRow}>
+            <Ionicons name="location-outline" size={16} color={colors.textSecondary} />
+            <Text style={styles.cityText}>Город: {state.profile?.city ?? 'Алматы'}</Text>
+          </View>
+          <AppInput
+            label="Адрес доставки"
+            placeholder="Улица, дом, квартира"
+            leftIcon="home-outline"
+            value={address}
+            onChangeText={setAddress}
+            error={touched && !addressOk ? 'Укажите адрес доставки (минимум 5 символов)' : null}
           />
-        ))}
-      </View>
+          <Text style={styles.sectionTitle}>Способ доставки</Text>
+          <View style={styles.options}>
+            {DELIVERY_METHODS.map((d) => (
+              <OptionCard
+                key={d.id}
+                icon={d.icon}
+                title={d.label}
+                subtitle={d.detail}
+                selected={delivery === d.id}
+                onPress={() => setDelivery(d.id)}
+              />
+            ))}
+          </View>
+        </>
+      ) : null}
 
-      {/* Summary */}
-      <View style={styles.summaryCard}>
-        <Row label={`Сумма (${summary.itemCount})`} value={formatPrice(summary.subtotal)} />
-        {summary.discountPercent > 0 ? (
-          <Row
-            label={`Скидка команды (${summary.discountPercent}%)`}
-            value={`−${formatPrice(summary.discountAmount)}`}
-            highlight
-          />
-        ) : null}
-        <Row label="Доставка" value="Бесплатно" />
-        <View style={styles.grandRow}>
-          <Text style={styles.grandLabel}>Итого</Text>
-          <Text style={styles.grandValue}>{formatPrice(summary.finalTotal)}</Text>
-        </View>
-      </View>
-
-      <Text style={styles.note}>
-        {halykConfigured()
-          ? 'Оплата через Halyk ePay. После оплаты вы вернётесь в приложение.'
-          : 'Оплата симулируется — задайте Halyk creds в config/payment.ts для боевого режима.'}
-      </Text>
+      {/* Step 2 — payment summary */}
+      {step === 2 ? (
+        <>
+          <Summary summary={summary} />
+          <Text style={styles.note}>
+            {halykConfigured()
+              ? 'Оплата через Halyk ePay. После оплаты вы вернётесь в приложение.'
+              : 'Оплата симулируется — задайте Halyk creds в config/payment.ts для боевого режима.'}
+          </Text>
+        </>
+      ) : null}
 
       <LoadingOverlay visible={processing} label={stage ? STAGE_LABEL[stage] : ''} />
     </ScreenContainer>
   );
 }
 
-function Header({ onBack }: { onBack: () => void }) {
+function Summary({ summary }: { summary: ReturnType<typeof summarize> }) {
   return (
-    <View style={styles.header}>
-      <Pressable onPress={onBack} hitSlop={10} accessibilityRole="button" accessibilityLabel="Назад">
-        <Ionicons name="chevron-back" size={26} color={colors.text} />
-      </Pressable>
-      <Text style={styles.headerTitle}>Оформление</Text>
-      <View style={{ width: 26 }} />
-    </View>
-  );
-}
-
-function Option({
-  selected,
-  icon,
-  title,
-  subtitle,
-  onPress,
-}: {
-  selected: boolean;
-  icon: keyof typeof Ionicons.glyphMap;
-  title: string;
-  subtitle?: string;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={[styles.option, selected && styles.optionSelected]}
-      accessibilityRole="button"
-      accessibilityState={{ selected }}
-    >
-      <Ionicons name={icon} size={20} color={selected ? colors.primary : colors.textSecondary} />
-      <View style={styles.optionBody}>
-        <Text style={[styles.optionTitle, selected && styles.optionTitleSelected]}>{title}</Text>
-        {subtitle ? <Text style={styles.optionSubtitle}>{subtitle}</Text> : null}
+    <View style={styles.summaryCard}>
+      <Row label={`Сумма (${summary.itemCount})`} value={formatPrice(summary.subtotal)} />
+      {summary.discountPercent > 0 ? (
+        <Row label={`Скидка команды (${summary.discountPercent}%)`} value={`−${formatPrice(summary.discountAmount)}`} highlight />
+      ) : null}
+      <Row label="Доставка" value="Бесплатно" />
+      <View style={styles.grandRow}>
+        <Text style={styles.grandLabel}>Итого</Text>
+        <Text style={styles.grandValue}>{formatPrice(summary.finalTotal)}</Text>
       </View>
-      <Ionicons
-        name={selected ? 'radio-button-on' : 'radio-button-off'}
-        size={20}
-        color={selected ? colors.primary : colors.borderStrong}
-      />
-    </Pressable>
+      {summary.discountAmount > 0 ? (
+        <View style={styles.savingsPill}>
+          <Ionicons name="sparkles" size={14} color={colors.success} />
+          <Text style={styles.savingsPillText}>Вы экономите {formatPrice(summary.discountAmount)}</Text>
+        </View>
+      ) : null}
+    </View>
   );
 }
 
 function Row({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
   return (
     <View style={styles.row}>
-      <Text style={[styles.rowLabel, highlight && { color: colors.success }]}>{label}</Text>
-      <Text style={[styles.rowValue, highlight && { color: colors.success }]}>{value}</Text>
+      <Text style={[styles.rowLabel, highlight && { color: colors.savingsDeep }]}>{label}</Text>
+      <Text style={[styles.rowValue, highlight && { color: colors.savingsDeep }]}>{value}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: spacing.sm, marginBottom: spacing.md },
-  headerTitle: { ...typography.h3, color: colors.text },
+  progressTop: { marginTop: spacing.sm },
+  stepCount: { ...typography.caption, color: colors.textMuted, marginTop: spacing.sm },
+  title: { ...typography.display, color: colors.text, marginTop: spacing.xs },
+  subtitle: { ...typography.body, color: colors.textSecondary, marginTop: spacing.xs },
+  context: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radii.pill,
+    marginTop: spacing.lg,
+  },
+  contextTeam: { backgroundColor: colors.successSoft },
+  contextIndividual: { backgroundColor: colors.surfaceStrong },
+  contextText: { ...typography.captionStrong },
   emptyText: { ...typography.body, color: colors.textSecondary, textAlign: 'center', marginVertical: spacing.xl },
-  typeBanner: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, padding: spacing.md, borderRadius: radii.md },
-  typeTeam: { backgroundColor: colors.successSoft },
-  typeIndividual: { backgroundColor: colors.infoSoft },
-  typeText: { ...typography.caption, fontWeight: '700', flex: 1 },
   sectionTitle: { ...typography.h3, color: colors.text, marginTop: spacing.xl, marginBottom: spacing.md },
   card: { backgroundColor: colors.surface, borderRadius: radii.lg, borderWidth: 1, borderColor: colors.border, paddingHorizontal: spacing.md, ...shadows.card },
   itemRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.md },
@@ -325,16 +334,10 @@ const styles = StyleSheet.create({
   itemTitle: { ...typography.caption, color: colors.text, flex: 1, fontWeight: '600' },
   itemQty: { ...typography.caption, color: colors.textMuted },
   itemPrice: { ...typography.caption, color: colors.text, fontWeight: '700' },
-  cityRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginBottom: spacing.md },
+  cityRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: spacing.lg, marginBottom: spacing.md },
   cityText: { ...typography.caption, color: colors.textSecondary },
   options: { gap: spacing.sm },
-  option: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.md, borderRadius: radii.md, borderWidth: 1.5, borderColor: colors.border, backgroundColor: colors.surface },
-  optionSelected: { borderColor: colors.primary, backgroundColor: colors.primarySoft },
-  optionBody: { flex: 1 },
-  optionTitle: { ...typography.bodyStrong, color: colors.text },
-  optionTitleSelected: { color: colors.primaryDark },
-  optionSubtitle: { ...typography.caption, color: colors.textSecondary, marginTop: 1 },
-  error: { ...typography.caption, color: colors.danger, marginTop: spacing.sm },
+  note: { ...typography.caption, color: colors.textMuted, textAlign: 'center', marginTop: spacing.lg },
   summaryCard: { backgroundColor: colors.surface, borderRadius: radii.lg, borderWidth: 1, borderColor: colors.border, padding: spacing.lg, marginTop: spacing.xl, ...shadows.card },
   row: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: spacing.xs },
   rowLabel: { ...typography.body, color: colors.textSecondary },
@@ -342,8 +345,11 @@ const styles = StyleSheet.create({
   grandRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border, marginTop: spacing.sm, paddingTop: spacing.md },
   grandLabel: { ...typography.h3, color: colors.text },
   grandValue: { ...typography.h2, color: colors.text },
-  note: { ...typography.caption, color: colors.textMuted, textAlign: 'center', marginTop: spacing.lg },
+  savingsPill: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, alignSelf: 'flex-start', backgroundColor: colors.successSoft, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderRadius: radii.pill, marginTop: spacing.md },
+  savingsPillText: { ...typography.caption, color: colors.savingsDeep, fontWeight: '700' },
   footerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.sm },
   footerLabel: { ...typography.body, color: colors.textSecondary },
   footerTotal: { ...typography.h2, color: colors.text },
+  backBtn: { alignItems: 'center', paddingVertical: spacing.md, marginTop: spacing.xs },
+  backText: { ...typography.bodyStrong, color: colors.text },
 });
