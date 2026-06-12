@@ -7,7 +7,7 @@ import { AppInput } from '@/components/AppInput';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { useToast } from '@/components/Toast';
 import { colors, spacing, typography } from '@/constants/theme';
-import { RECAPTCHA_CONTAINER_ID, sendOtp } from '@/lib/phoneAuth';
+import { sendOtp } from '@/lib/phoneAuth';
 import { useApp } from '@/store/AppContext';
 import { formatPhoneInput, isValidKzPhone, normalizePhone } from '@/utils/format';
 
@@ -91,9 +91,6 @@ export default function LoginScreen() {
             onPress={onSubmit}
             disabled={!canSubmit || sending}
           />
-
-          {/* Invisible reCAPTCHA mount point (web only; renders a <div>). */}
-          <View nativeID={RECAPTCHA_CONTAINER_ID} />
         </View>
 
         <Text style={styles.hint}>

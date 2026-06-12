@@ -19,11 +19,9 @@ import { Platform } from 'react-native';
 
 import { auth } from './firebase';
 
-/** DOM id the web invisible-reCAPTCHA attaches to (rendered in login.tsx). */
-export const RECAPTCHA_CONTAINER_ID = 'recaptcha-container';
-
 let verifier: RecaptchaVerifier | null = null;
 let confirmation: ConfirmationResult | null = null;
+let containerEl: HTMLElement | null = null;
 
 /** Strip everything except digits and a single leading "+" → strict E.164. */
 function toE164(raw: string): string {
@@ -31,32 +29,14 @@ function toE164(raw: string): string {
   return digits ? '+' + digits : '';
 }
 
-/** Guarantee the invisible-reCAPTCHA container exists in the DOM (web). */
-function ensureRecaptchaContainer(): void {
-  if (Platform.OS !== 'web' || typeof document === 'undefined') return;
-  if (!document.getElementById(RECAPTCHA_CONTAINER_ID)) {
-    const el = document.createElement('div');
-    el.id = RECAPTCHA_CONTAINER_ID;
-    el.style.display = 'none';
-    document.body.appendChild(el);
-  }
-}
-
 /**
- * Build a FRESH invisible reCAPTCHA verifier. A verifier that has already been
- * used (or errored) throws `auth/argument-error` if reused, so we clear any old
- * one and recreate it on every attempt.
+ * Tear down the current verifier AND remove its DOM container. grecaptcha
+ * registers itself against the container element, and `verifier.clear()` alone
+ * leaves that registration behind — so a second `new RecaptchaVerifier(...)` on
+ * the same element throws "reCAPTCHA has already been rendered in this element".
+ * Removing the node guarantees the next attempt starts from a clean slate.
  */
-function getVerifier(): RecaptchaVerifier {
-  if (!auth) {
-    throw new Error('Firebase не настроен. Проверьте ключи в .env.local.');
-  }
-  if (Platform.OS !== 'web') {
-    throw new Error(
-      'Вход по SMS пока работает только в web-сборке. Для iOS/Android нужен dev build с @react-native-firebase.',
-    );
-  }
-  ensureRecaptchaContainer();
+function destroyVerifier(): void {
   if (verifier) {
     try {
       verifier.clear();
@@ -65,9 +45,38 @@ function getVerifier(): RecaptchaVerifier {
     }
     verifier = null;
   }
-  verifier = new RecaptchaVerifier(auth, RECAPTCHA_CONTAINER_ID, {
-    size: 'invisible',
-  });
+  if (containerEl?.parentNode) {
+    containerEl.parentNode.removeChild(containerEl);
+  }
+  containerEl = null;
+}
+
+/**
+ * Build a FRESH invisible reCAPTCHA verifier on a brand-new, uniquely-id'd
+ * container. Reusing a container (or a spent verifier) throws either
+ * `auth/argument-error` or "already rendered", so we always start clean.
+ */
+function getVerifier(): RecaptchaVerifier {
+  if (!auth) {
+    throw new Error('Firebase не настроен. Проверьте ключи в .env.local.');
+  }
+  if (Platform.OS !== 'web' || typeof document === 'undefined') {
+    throw new Error(
+      'Вход по SMS пока работает только в web-сборке. Для iOS/Android нужен dev build с @react-native-firebase.',
+    );
+  }
+
+  // Always tear down anything left over from a previous attempt.
+  destroyVerifier();
+
+  // Fresh container with a unique id so grecaptcha never sees an element it has
+  // already rendered into.
+  containerEl = document.createElement('div');
+  containerEl.id = `recaptcha-${Date.now()}`;
+  containerEl.style.display = 'none';
+  document.body.appendChild(containerEl);
+
+  verifier = new RecaptchaVerifier(auth, containerEl, { size: 'invisible' });
   return verifier;
 }
 
@@ -101,13 +110,8 @@ export async function sendOtp(phone: string): Promise<void> {
       phone: e164,
       verifierType: appVerifier?.type,
     });
-    // Reset so the next attempt builds a clean verifier.
-    try {
-      verifier?.clear();
-    } catch {
-      // ignore
-    }
-    verifier = null;
+    // Reset so the next attempt builds a clean verifier + container.
+    destroyVerifier();
     throw err;
   }
 }
@@ -124,4 +128,5 @@ export async function confirmOtp(code: string): Promise<string> {
 /** Clear any in-flight confirmation (e.g. when leaving the flow). */
 export function resetOtp(): void {
   confirmation = null;
+  destroyVerifier();
 }
