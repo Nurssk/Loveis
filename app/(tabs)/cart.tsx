@@ -10,6 +10,7 @@ import { ScreenContainer } from '@/components/ScreenContainer';
 import { categoryLabel } from '@/data/categories';
 import { colors, radii, shadows, spacing, typography } from '@/constants/theme';
 import { useApp } from '@/store/AppContext';
+import { useProductsCtx } from '@/store/ProductsContext';
 import { CartKind } from '@/types';
 import { CartLine, summarize } from '@/utils/cart';
 import { teamDiscountPercent } from '@/utils/discount';
@@ -20,9 +21,10 @@ export default function CartScreen() {
   const { state, setQuantity, removeFromCart } = useApp();
   const [tab, setTab] = useState<CartKind>('individual');
 
+  const { getProduct } = useProductsCtx();
   const memberCount = state.team?.members.length ?? 0;
-  const individual = useMemo(() => summarize(state.cart.individualItems, 0), [state.cart.individualItems]);
-  const team = useMemo(() => summarize(state.cart.teamItems, memberCount), [state.cart.teamItems, memberCount]);
+  const individual = useMemo(() => summarize(state.cart.individualItems, getProduct, 0), [state.cart.individualItems, getProduct]);
+  const team = useMemo(() => summarize(state.cart.teamItems, getProduct, memberCount), [state.cart.teamItems, getProduct, memberCount]);
 
   const active = tab === 'individual' ? individual : team;
 
@@ -137,6 +139,24 @@ export default function CartScreen() {
             </View>
           ) : null}
 
+          {tab === 'team' && !state.team ? (
+            <View style={styles.noTeamCard}>
+              <View style={styles.noTeamHeader}>
+                <Ionicons name="alert-circle" size={18} color={colors.warning} />
+                <Text style={styles.noTeamTitle}>Вы не в команде</Text>
+              </View>
+              <Text style={styles.noTeamText}>
+                Чтобы получить скидку до 30%, создайте команду или присоединитесь по коду.
+              </Text>
+              <AppButton
+                title="Создать или присоединиться"
+                icon="people-outline"
+                onPress={() => router.push('/(tabs)/team')}
+                style={styles.noTeamBtn}
+              />
+            </View>
+          ) : null}
+
           <View style={styles.lines}>
             {active.lines.map((l) => (
               <Line key={l.product.id} line={l} kind={tab} />
@@ -186,7 +206,22 @@ const styles = StyleSheet.create({
   segmentTextActive: { color: colors.text },
   content: { marginTop: spacing.lg },
   teamInfo: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: colors.successSoft, padding: spacing.md, borderRadius: radii.sm, marginBottom: spacing.md },
-  teamInfoText: { ...typography.caption, color: colors.savingsDeep, fontWeight: '700', flex: 1 },
+  teamInfoText: { ...typography.caption, color: colors.success, fontWeight: '700', flex: 1 },
+  noTeamCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radii.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.warning,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    ...shadows.card,
+  },
+  noTeamHeader: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, marginBottom: spacing.xs },
+  noTeamTitle: { ...typography.bodyStrong, color: colors.text },
+  noTeamText: { ...typography.caption, color: colors.textSecondary, lineHeight: 18 },
+  noTeamBtn: { marginTop: spacing.md },
   lines: { gap: spacing.md },
   line: {
     flexDirection: 'row',

@@ -15,6 +15,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ToastProvider } from '@/components/Toast';
 import { colors } from '@/constants/theme';
 import { AppProvider } from '@/store/AppContext';
+import { ProductsProvider } from '@/store/ProductsContext';
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -36,6 +37,7 @@ export default function RootLayout() {
   return (
     <SafeAreaProvider>
       <AppProvider>
+        <ProductsProvider>
         <ToastProvider>
           <StatusBar style="dark" />
           <Stack
@@ -55,6 +57,7 @@ export default function RootLayout() {
             <Stack.Screen name="checkout" />
           </Stack>
         </ToastProvider>
+        </ProductsProvider>
       </AppProvider>
     </SafeAreaProvider>
   );

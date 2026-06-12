@@ -1,5 +1,19 @@
 {
   "enabledPlugins": {
     "expo@claude-plugins-official": true
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const fs=require('fs'),p='changes.txt';if(fs.existsSync(p)){const c=fs.readFileSync(p,'utf8');console.log(JSON.stringify({hookSpecificOutput:{hookEventName:'SessionStart',additionalContext:'=== CHANGES LOG (changes.txt) ===\\n'+c+'\\n=== END CHANGES LOG ==='}}));}\"",
+            "shell": "powershell",
+            "statusMessage": "Loading changes log..."
+          }
+        ]
+      }
+    ]
   }
 }

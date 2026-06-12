@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { AppButton } from '@/components/AppButton';
@@ -13,9 +13,9 @@ import { Rating } from '@/components/Rating';
 import { ScreenContainer } from '@/components/ScreenContainer';
 import { useToast } from '@/components/Toast';
 import { categoryLabel } from '@/data/categories';
-import { getProduct } from '@/data/products';
 import { colors, LAYOUT, radii, shadows, spacing, typography } from '@/constants/theme';
 import { useApp } from '@/store/AppContext';
+import { useProductsCtx } from '@/store/ProductsContext';
 import { applyDiscount, teamDiscountPercent } from '@/utils/discount';
 import { formatPrice, memberWord } from '@/utils/format';
 import { batchProgress } from '@/utils/seller';
@@ -26,7 +26,8 @@ export default function ProductDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const toast = useToast();
-  const { state, addToCart, markViewed } = useApp();
+  const { state, addToCart, markViewed, saveProduct, unsaveProduct } = useApp();
+  const { getProduct, loading } = useProductsCtx();
   const [modalVisible, setModalVisible] = useState(false);
 
   const product = id ? getProduct(id) : undefined;
@@ -35,6 +36,17 @@ export default function ProductDetailScreen() {
     if (product) markViewed(product.id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [product?.id]);
+
+  if (loading && !product) {
+    return (
+      <ScreenContainer>
+        <Pressable onPress={() => router.back()} style={styles.backStandalone} accessibilityLabel="Назад" accessibilityRole="button">
+          <Ionicons name="chevron-back" size={26} color={colors.text} />
+        </Pressable>
+        <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 48 }} />
+      </ScreenContainer>
+    );
+  }
 
   if (!product) {
     return (
@@ -52,6 +64,17 @@ export default function ProductDetailScreen() {
       </ScreenContainer>
     );
   }
+
+  const isSaved = state.savedProducts.includes(product.id);
+  const toggleSave = () => {
+    if (isSaved) {
+      unsaveProduct(product.id);
+      toast.show('Убрано из сохранённых');
+    } else {
+      saveProduct(product.id);
+      toast.show('Сохранено в закладки');
+    }
+  };
 
   const hasTeam = !!state.team;
   const teamSize = state.team?.members.length ?? PREVIEW_TEAM_SIZE;
@@ -187,11 +210,55 @@ export default function ProductDetailScreen() {
         </View>
       </ScreenContainer>
 
-      {/* Sticky actions */}
+      {/* Sticky actions — Pinduoduo style: icon shortcuts + 2 buy buttons */}
       <SafeAreaView edges={['bottom']} style={styles.actionBar}>
         <View style={styles.actionInner}>
-          <AppButton title="Купить индивидуально" variant="ghost" icon="person-outline" onPress={addIndividual} style={styles.actionBtn} />
-          <AppButton title="В командную корзину" icon="people" onPress={addTeam} style={styles.actionBtn} />
+          {/* Store & Save icon buttons */}
+          <View style={styles.iconBtns}>
+            <Pressable
+              onPress={() => router.back()}
+              style={styles.iconBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Магазин"
+            >
+              <Ionicons name="storefront-outline" size={22} color={colors.textSecondary} />
+              <Text style={styles.iconBtnLabel}>Магазин</Text>
+            </Pressable>
+            <Pressable
+              onPress={toggleSave}
+              style={styles.iconBtn}
+              accessibilityRole="button"
+              accessibilityLabel={isSaved ? 'Убрать из сохранённых' : 'Сохранить'}
+            >
+              <Ionicons
+                name={isSaved ? 'bookmark' : 'bookmark-outline'}
+                size={22}
+                color={isSaved ? colors.primary : colors.textSecondary}
+              />
+              <Text style={[styles.iconBtnLabel, isSaved && { color: colors.primary }]}>
+                {isSaved ? 'Сохранено' : 'Сохранить'}
+              </Text>
+            </Pressable>
+          </View>
+          <View style={styles.iconSeparator} />
+          <Pressable
+            onPress={addIndividual}
+            style={styles.buyAloneBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Купить одному"
+          >
+            <Text style={styles.buyAlonePrice}>{formatPrice(product.regularPrice)}</Text>
+            <Text style={styles.buyAloneLabel}>Купить одному</Text>
+          </Pressable>
+          <Pressable
+            onPress={addTeam}
+            style={styles.buyTeamBtn}
+            accessibilityRole="button"
+            accessibilityLabel="Купить в команде"
+          >
+            <Text style={styles.buyTeamPrice}>{formatPrice(tPrice)}</Text>
+            <Text style={styles.buyTeamLabel}>В команде −{percent}%</Text>
+          </Pressable>
         </View>
       </SafeAreaView>
 
@@ -293,8 +360,34 @@ const styles = StyleSheet.create({
   groupFill: { height: '100%', borderRadius: radii.pill, backgroundColor: colors.success },
   groupHint: { ...typography.caption, color: colors.savingsDeep, marginTop: spacing.sm },
   actionBar: { backgroundColor: colors.surface, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border },
-  actionInner: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: spacing.md, maxWidth: LAYOUT.maxContentWidth, alignSelf: 'center', width: '100%' },
+  actionInner: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.md, paddingVertical: spacing.md, maxWidth: LAYOUT.maxContentWidth, alignSelf: 'center', width: '100%' },
   actionBtn: { flex: 1 },
+  iconBtns: { flexDirection: 'row', gap: spacing.xs },
+  iconBtn: { alignItems: 'center', justifyContent: 'center', width: 48, paddingVertical: 2 },
+  iconBtnLabel: { ...typography.small, color: colors.textSecondary, marginTop: 2, fontSize: 10, textAlign: 'center' },
+  iconSeparator: { width: StyleSheet.hairlineWidth, backgroundColor: colors.border, alignSelf: 'stretch', marginHorizontal: spacing.xs },
+  buyAloneBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.md,
+    borderRadius: radii.md,
+    backgroundColor: colors.surfaceAlt,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  buyAlonePrice: { ...typography.h3, color: colors.text },
+  buyAloneLabel: { ...typography.small, color: colors.textSecondary, marginTop: 2 },
+  buyTeamBtn: {
+    flex: 1.2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.md,
+    borderRadius: radii.md,
+    backgroundColor: colors.primary,
+  },
+  buyTeamPrice: { ...typography.h3, color: colors.textInverse },
+  buyTeamLabel: { ...typography.small, color: colors.textInverse, marginTop: 2, fontWeight: '700' },
   modalBackdrop: { flex: 1, backgroundColor: colors.overlay, justifyContent: 'flex-end' },
   modalCard: {
     backgroundColor: colors.surface,

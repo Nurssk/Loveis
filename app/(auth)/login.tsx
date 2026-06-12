@@ -1,21 +1,25 @@
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { Keyboard, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
+import { Keyboard, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AppButton } from '@/components/AppButton';
 import { AppInput } from '@/components/AppInput';
 import { ScreenContainer } from '@/components/ScreenContainer';
+import { useToast } from '@/components/Toast';
 import { colors, spacing, typography } from '@/constants/theme';
+import { RECAPTCHA_CONTAINER_ID, sendOtp } from '@/lib/phoneAuth';
 import { useApp } from '@/store/AppContext';
 import { formatPhoneInput, isValidKzPhone, normalizePhone } from '@/utils/format';
 
 export default function LoginScreen() {
   const router = useRouter();
   const { login } = useApp();
+  const toast = useToast();
 
   const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [touched, setTouched] = useState(false);
+  const [sending, setSending] = useState(false);
 
   const phoneOk = isValidKzPhone(phone);
   const passwordOk = password.length >= 6;
@@ -28,12 +32,21 @@ export default function LoginScreen() {
 
   const passwordError = touched && password.length > 0 && !passwordOk ? 'Минимум 6 символов' : null;
 
-  const onSubmit = () => {
+  const onSubmit = async () => {
     setTouched(true);
-    if (!canSubmit) return;
+    if (!canSubmit || sending) return;
     Keyboard.dismiss();
-    login(normalizePhone(phone));
-    router.replace('/(auth)/sms-verification');
+    const e164 = normalizePhone(phone);
+    try {
+      setSending(true);
+      login(e164);
+      await sendOtp(e164);
+      router.replace('/(auth)/sms-verification');
+    } catch (e) {
+      toast.show(e instanceof Error ? e.message : 'Не удалось отправить код', 'error');
+    } finally {
+      setSending(false);
+    }
   };
 
   return (
@@ -72,7 +85,20 @@ export default function LoginScreen() {
 
         {/* Buttons */}
         <View style={styles.actions}>
-          <AppButton title="Войти" onPress={onSubmit} disabled={!canSubmit} icon="log-in-outline" />
+          <Pressable
+            onPress={() => toast.show('Демо-режим: восстановление пароля недоступно', 'info')}
+            style={styles.forgot}
+            accessibilityRole="button"
+          >
+            <Text style={styles.forgotText}>Забыли пароль?</Text>
+          </Pressable>
+
+          <AppButton
+            title={sending ? 'Отправляем код…' : 'Войти'}
+            onPress={onSubmit}
+            disabled={!canSubmit || sending}
+            icon="log-in-outline"
+          />
 
           <View style={styles.divider}>
             <View style={styles.line} />
@@ -80,7 +106,15 @@ export default function LoginScreen() {
             <View style={styles.line} />
           </View>
 
-          <AppButton title="Создать аккаунт" variant="secondary" onPress={onSubmit} disabled={!canSubmit} />
+          <AppButton
+            title="Зарегистрироваться"
+            variant="secondary"
+            onPress={onSubmit}
+            disabled={!canSubmit || sending}
+          />
+
+          {/* Invisible reCAPTCHA mount point (web only; renders a <div>). */}
+          <View nativeID={RECAPTCHA_CONTAINER_ID} />
         </View>
 
         <Text style={styles.hint}>
@@ -102,6 +136,8 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   form: { marginBottom: spacing.lg },
+  forgot: { alignSelf: 'flex-end', marginBottom: spacing.md },
+  forgotText: { ...typography.caption, color: colors.primary, fontWeight: '700' },
   actions: {},
   divider: { flexDirection: 'row', alignItems: 'center', marginVertical: spacing.lg },
   line: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.border },

@@ -13,10 +13,9 @@ export type Product = {
   tags: string[];
   popularity: number;
   activeBuyers: number;
-  // Seller-created products only. Identifies the merchant and the group-buy target.
   sellerId?: string;
-  minBatch?: number; // participants needed to unlock the wholesale (group) price
-  groupPrice?: number; // wholesale price the seller offers once the batch fills
+  minBatch?: number;
+  groupPrice?: number;
 };
 
 export type UserProfile = {
@@ -28,9 +27,9 @@ export type UserProfile = {
   interests: string[];
   isVerified: boolean;
   deviceId: string;
-  // Merchant cabinet. A buyer can also open a store; both modes share one profile.
   isSeller?: boolean;
   storeName?: string;
+  currentTeamId?: string;
 };
 
 /** Draft passed from the add/edit product form into the store. */
@@ -70,9 +69,12 @@ export type CartState = {
 
 export type CartKind = 'individual' | 'team';
 
+export type OrderStatus = 'pending_participants' | 'confirmed' | 'shipped' | 'delivered';
+
 export type Order = {
   id: string;
   kind: CartKind;
+  status: OrderStatus;
   total: number;
   city: string;
   address: string;
@@ -80,11 +82,26 @@ export type Order = {
   paymentMethod: string;
   itemCount: number;
   createdAt: string;
+  teamId?: string;
+  membersNeeded?: number;
+  membersAtOrder?: number;
+};
+
+export type CouponType = 'newcomer' | 'team_player' | 'first_purchase';
+
+export type Coupon = {
+  id: string;
+  type: CouponType;
+  title: string;
+  description: string;
+  discount: number;
+  earnedAt: string;
+  usedAt?: string;
 };
 
 export type Category = {
   id: string;
   label: string;
-  icon: string; // Ionicons name
+  icon: string;
   color: string;
 };
