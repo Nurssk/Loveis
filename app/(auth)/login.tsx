@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
 import React, { useMemo, useState } from 'react';
-import { Keyboard, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Keyboard, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
 
 import { AppButton } from '@/components/AppButton';
 import { AppInput } from '@/components/AppInput';
@@ -17,20 +17,16 @@ export default function LoginScreen() {
   const toast = useToast();
 
   const [phone, setPhone] = useState('');
-  const [password, setPassword] = useState('');
   const [touched, setTouched] = useState(false);
   const [sending, setSending] = useState(false);
 
   const phoneOk = isValidKzPhone(phone);
-  const passwordOk = password.length >= 6;
-  const canSubmit = phoneOk && passwordOk;
+  const canSubmit = phoneOk;
 
   const phoneError = useMemo(() => {
     if (!touched || phoneOk || phone.replace(/\D/g, '').length <= 1) return null;
     return 'Введите корректный номер: +7 7XX XXX XX XX';
   }, [touched, phoneOk, phone]);
-
-  const passwordError = touched && password.length > 0 && !passwordOk ? 'Минимум 6 символов' : null;
 
   const onSubmit = async () => {
     setTouched(true);
@@ -72,27 +68,10 @@ export default function LoginScreen() {
             error={phoneError}
             maxLength={18}
           />
-          <AppInput
-            leftIcon="lock-closed-outline"
-            placeholder="Пароль (минимум 6 символов)"
-            password
-            value={password}
-            onChangeText={setPassword}
-            error={passwordError}
-            autoCapitalize="none"
-          />
         </View>
 
         {/* Buttons */}
         <View style={styles.actions}>
-          <Pressable
-            onPress={() => toast.show('Демо-режим: восстановление пароля недоступно', 'info')}
-            style={styles.forgot}
-            accessibilityRole="button"
-          >
-            <Text style={styles.forgotText}>Забыли пароль?</Text>
-          </Pressable>
-
           <AppButton
             title={sending ? 'Отправляем код…' : 'Войти'}
             onPress={onSubmit}
@@ -118,7 +97,7 @@ export default function LoginScreen() {
         </View>
 
         <Text style={styles.hint}>
-          Демо: подойдёт любой корректный номер +7 и пароль из 6+ символов.
+          Введите номер +7 — мы отправим SMS с кодом подтверждения.
         </Text>
       </KeyboardAvoidingView>
     </ScreenContainer>
@@ -136,8 +115,6 @@ const styles = StyleSheet.create({
     marginTop: spacing.sm,
   },
   form: { marginBottom: spacing.lg },
-  forgot: { alignSelf: 'flex-end', marginBottom: spacing.md },
-  forgotText: { ...typography.caption, color: colors.primary, fontWeight: '700' },
   actions: {},
   divider: { flexDirection: 'row', alignItems: 'center', marginVertical: spacing.lg },
   line: { flex: 1, height: StyleSheet.hairlineWidth, backgroundColor: colors.border },
