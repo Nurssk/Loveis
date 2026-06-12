@@ -16,13 +16,6 @@ import { Product } from '@/types';
 import { itemWord } from '@/utils/format';
 import { bestSavings, popularTeamPurchases, recommendedProducts, searchProducts } from '@/utils/recommendations';
 
-function greeting(): string {
-  const h = new Date().getHours();
-  if (h < 6) return 'Доброй ночи';
-  if (h < 12) return 'Доброе утро';
-  if (h < 18) return 'Добрый день';
-  return 'Добрый вечер';
-}
 
 export default function HomeScreen() {
   const router = useRouter();
@@ -30,6 +23,7 @@ export default function HomeScreen() {
 
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<string | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const teamCount = state.team?.members.length ?? 0;
   const open = (id: string) => router.push(`/product/${id}`);
@@ -66,43 +60,66 @@ export default function HomeScreen() {
 
   return (
     <ScreenContainer padded={false} edges={['top']}>
-      {/* Greeting */}
-      <View style={styles.greetingBlock}>
-        <Text style={styles.greeting}>{greeting()},</Text>
-        <View style={styles.cityRow}>
-          <Ionicons name="location-outline" size={15} color={colors.primary} />
-          <Text style={styles.city}>{state.profile?.city ?? 'Алматы'}</Text>
-        </View>
-      </View>
+      {/* Top bar: PFP | Location | Search */}
+      <View style={styles.topBar}>
+        <Pressable onPress={() => router.push('/(tabs)/profile')} style={styles.avatarBtn} accessibilityLabel="Профиль">
+          <Text style={styles.avatarInitial}>
+            {(state.profile?.name ?? 'U')[0].toUpperCase()}
+          </Text>
+        </Pressable>
 
-      {/* Search */}
-      <View style={styles.searchRow}>
-        <View style={styles.search}>
-          <Ionicons name="search" size={18} color={colors.text} />
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Поиск товаров и магазинов"
-            placeholderTextColor={colors.textMuted}
-            style={styles.searchInput}
-            returnKeyType="search"
-            accessibilityLabel="Поиск"
-          />
-          {query.length > 0 ? (
-            <Pressable onPress={() => setQuery('')} hitSlop={8} accessibilityLabel="Очистить">
-              <Ionicons name="close-circle" size={18} color={colors.textMuted} />
-            </Pressable>
-          ) : null}
+        <View style={styles.locationBlock}>
+          <Text style={styles.locationLabel}>Местоположение</Text>
+          <View style={styles.cityRow}>
+            <Ionicons name="location-sharp" size={13} color={colors.primary} />
+            <Text style={styles.city}>{state.profile?.city ?? 'Алматы'}</Text>
+            <Ionicons name="chevron-down" size={13} color={colors.textMuted} />
+          </View>
         </View>
+
         <Pressable
-          onPress={() => setCategory(null)}
-          style={[styles.filterBtn, category && styles.filterBtnActive]}
-          accessibilityRole="button"
-          accessibilityLabel="Сбросить фильтр"
+          onPress={() => {
+            if (searchOpen) setQuery('');
+            setSearchOpen((v) => !v);
+          }}
+          style={[styles.iconBtn, searchOpen && styles.iconBtnActive]}
+          accessibilityLabel="Поиск"
         >
-          <Ionicons name="options-outline" size={20} color={category ? colors.primaryDark : colors.text} />
+          <Ionicons name={searchOpen ? 'close' : 'search'} size={20} color={searchOpen ? colors.primary : colors.text} />
         </Pressable>
       </View>
+
+      {/* Collapsible search */}
+      {searchOpen && (
+        <View style={styles.searchRow}>
+          <View style={styles.search}>
+            <Ionicons name="search" size={18} color={colors.text} />
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Поиск товаров и магазинов"
+              placeholderTextColor={colors.textMuted}
+              style={styles.searchInput}
+              returnKeyType="search"
+              autoFocus
+              accessibilityLabel="Поиск"
+            />
+            {query.length > 0 ? (
+              <Pressable onPress={() => setQuery('')} hitSlop={8} accessibilityLabel="Очистить">
+                <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+              </Pressable>
+            ) : null}
+          </View>
+          <Pressable
+            onPress={() => setCategory(null)}
+            style={[styles.filterBtn, category && styles.filterBtnActive]}
+            accessibilityRole="button"
+            accessibilityLabel="Сбросить фильтр"
+          >
+            <Ionicons name="options-outline" size={20} color={category ? colors.primaryDark : colors.text} />
+          </Pressable>
+        </View>
+      )}
 
       {/* Category strip */}
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
@@ -182,14 +199,44 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.sm,
   },
-  greetingBlock: { paddingHorizontal: spacing.lg, marginTop: spacing.md },
-  greeting: { ...typography.caption, color: colors.textSecondary },
-  cityRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 2 },
-  city: { ...typography.h2, color: colors.text },
+  avatarBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: radii.pill,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  avatarInitial: {
+    ...typography.bodyStrong,
+    color: colors.textInverse,
+  },
+  locationBlock: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  locationLabel: {
+    ...typography.caption,
+    color: colors.textSecondary,
+  },
+  cityRow: { flexDirection: 'row', alignItems: 'center', gap: 3, marginTop: 1 },
+  city: { ...typography.h3, color: colors.text },
+  iconBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: radii.pill,
+    backgroundColor: colors.surfaceStrong,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconBtnActive: {
+    backgroundColor: colors.primarySoft,
+  },
 
-  searchRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.lg, marginTop: spacing.lg },
+  searchRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, paddingHorizontal: spacing.lg, marginTop: spacing.sm, marginBottom: spacing.xs },
   search: {
     flex: 1,
     flexDirection: 'row',
